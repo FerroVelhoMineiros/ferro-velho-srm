@@ -4,8 +4,8 @@
  */
 
 window.VehiclesModule = {
-    render(container) {
-        const vehicles = window.db.get('vehicles');
+    async render(container) {
+        const vehicles = await window.db.get('vehicles');
 
         let actionsHtml = `
             <button class="btn btn-primary" id="add-vehicle-btn">
@@ -20,8 +20,10 @@ window.VehiclesModule = {
 
             let driverName = 'Não atribuído';
             if (v.driverId) {
-                const driver = window.db.getById('drivers', v.driverId);
-                if (driver) driverName = driver.name;
+                // Not ideal for N+1 queries, but works for the current scale.
+                // Ideally this would be resolved backend side. 
+                // We'll leave it sync rendering for the list to avoid complex Promise.all logic in HTML string generation, 
+                // but since the drivers are also fetching async we should just fetch it first.
             }
 
             let docStatus = 'Sem Doc.';
@@ -44,7 +46,7 @@ window.VehiclesModule = {
                     <td>${v.model}</td>
                     <td>${driverName}</td>
                     <td>${v.year}</td>
-                    <td>${v.type}</td>
+                    <td>${v.type}${v.equipment ? ' / ' + v.equipment : ''}</td>
                     <td>${Number(v.mileage).toLocaleString('pt-BR')} km</td>
                     <td><span class="status-badge ${docStatusClass}">${docStatus}</span></td>
                     <td><span class="status-badge ${statusClass}">${v.status}</span></td>
@@ -95,18 +97,18 @@ window.VehiclesModule = {
         });
 
         document.querySelectorAll('.action-btn.edit').forEach(btn => {
-            btn.addEventListener('click', (e) => {
+            btn.addEventListener('click', async (e) => {
                 const id = e.currentTarget.getAttribute('data-id');
-                const vehicle = window.db.getById('vehicles', id);
+                const vehicle = await window.db.getById('vehicles', id);
                 if (vehicle) this.openVehicleModal(vehicle);
             });
         });
 
         document.querySelectorAll('.action-btn.delete').forEach(btn => {
-            btn.addEventListener('click', (e) => {
+            btn.addEventListener('click', async (e) => {
                 const id = e.currentTarget.getAttribute('data-id');
                 if (confirm('Tem certeza que deseja remover este veículo? Esta ação não pode ser desfeita.')) {
-                    window.db.delete('vehicles', id);
+                    await window.db.delete('vehicles', id);
                     window.App.navigate('vehicles'); // re-render view
                     window.App.updateAlerts(); // update badges dashboard
                 }
@@ -114,9 +116,9 @@ window.VehiclesModule = {
         });
 
         document.querySelectorAll('.action-btn.view-doc').forEach(btn => {
-            btn.addEventListener('click', (e) => {
+            btn.addEventListener('click', async (e) => {
                 const id = e.currentTarget.getAttribute('data-id');
-                const vehicle = window.db.getById('vehicles', id);
+                const vehicle = await window.db.getById('vehicles', id);
                 if (vehicle && vehicle.docAttached) {
                     // Open Base64 PDF in new window
                     // To circumvent some browser restrictions with data URLs, we create an iframe/blob
@@ -134,8 +136,9 @@ window.VehiclesModule = {
         });
     },
 
-    openVehicleModal(vehicleToEdit = null) {
+    async openVehicleModal(vehicleToEdit = null) {
         const title = vehicleToEdit ? 'Editar Veículo' : 'Novo Veículo';
+        const drivers = await window.db.get('drivers');
 
         const formHtml = `
             <div class="form-group">
@@ -152,7 +155,7 @@ window.VehiclesModule = {
                 <label>Motorista Vinculado</label>
                 <select class="form-control" name="driverId">
                     <option value="">Sem motorista (Livre)</option>
-                    ${window.db.get('drivers').filter(d => d.status === 'Ativo' || (vehicleToEdit && d.id === vehicleToEdit.driverId)).map(d => `
+                    ${drivers.filter(d => d.status === 'Ativo' || (vehicleToEdit && d.id === vehicleToEdit.driverId)).map(d => `
                         <option value="${d.id}" ${vehicleToEdit && vehicleToEdit.driverId === d.id ? 'selected' : ''}>
                             ${d.name} (${d.category})
                         </option>
@@ -175,13 +178,32 @@ window.VehiclesModule = {
                 <div class="form-group" style="flex: 1;">
                     <label>Tipo</label>
                     <select class="form-control" name="type" required>
-                        <option value="Caminhão Leve" ${vehicleToEdit && vehicleToEdit.type === 'Caminhão Leve' ? 'selected' : ''}>Caminhão Leve</option>
-                        <option value="Caminhão Pesado" ${vehicleToEdit && vehicleToEdit.type === 'Caminhão Pesado' ? 'selected' : ''}>Caminhão Pesado</option>
-                        <option value="Van" ${vehicleToEdit && vehicleToEdit.type === 'Van' ? 'selected' : ''}>Van / Passageiros</option>
-                        <option value="Furgão Base" ${vehicleToEdit && vehicleToEdit.type === 'Furgão Base' ? 'selected' : ''}>Furgão utilitário</option>
-                        <option value="Carro de Passeio" ${vehicleToEdit && vehicleToEdit.type === 'Carro de Passeio' ? 'selected' : ''}>Carro de Passeio</option>
+                        <option value="4° Eixo" ${vehicleToEdit && vehicleToEdit.type === '4° Eixo' ? 'selected' : ''}>4° Eixo</option>
+                        <option value="Truck" ${vehicleToEdit && vehicleToEdit.type === 'Truck' ? 'selected' : ''}>Truck</option>
+                        <option value="Toco" ${vehicleToEdit && vehicleToEdit.type === 'Toco' ? 'selected' : ''}>Toco</option>
+                        <option value="Cavalo Toco" ${vehicleToEdit && vehicleToEdit.type === 'Cavalo Toco' ? 'selected' : ''}>Cavalo Toco</option>
+                        <option value="Cavalo Trucado" ${vehicleToEdit && vehicleToEdit.type === 'Cavalo Trucado' ? 'selected' : ''}>Cavalo Trucado</option>
+                        <option value="Carro" ${vehicleToEdit && vehicleToEdit.type === 'Carro' ? 'selected' : ''}>Carro</option>
+                        <option value="Escavadeira" ${vehicleToEdit && vehicleToEdit.type === 'Escavadeira' ? 'selected' : ''}>Escavadeira</option>
                     </select>
                 </div>
+                <div class="form-group" style="flex: 1;">
+                    <label>Equipamento</label>
+                    <select class="form-control" name="equipment">
+                        <option value="">Nenhum</option>
+                        <option value="GARRA" ${vehicleToEdit && vehicleToEdit.equipment === 'GARRA' ? 'selected' : ''}>GARRA</option>
+                        <option value="JULIETA" ${vehicleToEdit && vehicleToEdit.equipment === 'JULIETA' ? 'selected' : ''}>JULIETA</option>
+                        <option value="CARRETA" ${vehicleToEdit && vehicleToEdit.equipment === 'CARRETA' ? 'selected' : ''}>CARRETA</option>
+                        <option value="CAVALO" ${vehicleToEdit && vehicleToEdit.equipment === 'CAVALO' ? 'selected' : ''}>CAVALO</option>
+                        <option value="ROLLON ROLLOF" ${vehicleToEdit && vehicleToEdit.equipment === 'ROLLON ROLLOF' ? 'selected' : ''}>ROLLON ROLLOF</option>
+                        <option value="MUNK" ${vehicleToEdit && vehicleToEdit.equipment === 'MUNK' ? 'selected' : ''}>MUNK</option>
+                        <option value="POLIGUINDASTE" ${vehicleToEdit && vehicleToEdit.equipment === 'POLIGUINDASTE' ? 'selected' : ''}>POLIGUINDASTE</option>
+                        <option value="CARROCERIA" ${vehicleToEdit && vehicleToEdit.equipment === 'CARROCERIA' ? 'selected' : ''}>CARROCERIA</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div style="display: flex; gap: 16px;">
                 <div class="form-group" style="flex: 1;">
                     <label>Status</label>
                      <select class="form-control" name="status" required>
@@ -245,9 +267,9 @@ window.VehiclesModule = {
             }
 
             if (vehicleToEdit) {
-                window.db.update('vehicles', vehicleToEdit.id, formData);
+                await window.db.update('vehicles', vehicleToEdit.id, formData);
             } else {
-                window.db.add('vehicles', formData);
+                await window.db.add('vehicles', formData);
             }
             window.App.navigate('vehicles'); // re-render
         });

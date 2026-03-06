@@ -4,8 +4,8 @@
  */
 
 window.PartsModule = {
-    render(container) {
-        const parts = window.db.get('parts');
+    async render(container) {
+        const parts = await window.db.get('parts');
 
         let actionsHtml = `<button class="btn btn-primary" id="add-part-btn"><i class="fa-solid fa-plus"></i> Nova Peça</button>`;
 
@@ -86,18 +86,18 @@ window.PartsModule = {
         document.getElementById('add-part-btn')?.addEventListener('click', () => this.openFormModal());
 
         document.querySelectorAll('.action-btn.edit').forEach(btn => {
-            btn.addEventListener('click', (e) => {
+            btn.addEventListener('click', async (e) => {
                 const id = e.currentTarget.getAttribute('data-id');
-                const part = window.db.getById('parts', id);
+                const part = await window.db.getById('parts', id);
                 if (part) this.openStockUpdateModal(part);
             });
         });
 
         document.querySelectorAll('.action-btn.delete').forEach(btn => {
-            btn.addEventListener('click', (e) => {
+            btn.addEventListener('click', async (e) => {
                 const id = e.currentTarget.getAttribute('data-id');
                 if (confirm('Remover esta peça do cadastro?')) {
-                    window.db.delete('parts', id);
+                    await window.db.delete('parts', id);
                     window.App.navigate('parts');
                 }
             });
@@ -143,8 +143,8 @@ window.PartsModule = {
             </div>
         `;
 
-        window.UI.showModal('Cadastrar Peça', formHtml, (formData) => {
-            window.db.add('parts', formData);
+        window.UI.showModal('Cadastrar Peça', formHtml, async (formData) => {
+            await window.db.add('parts', formData);
             window.App.navigate('parts');
         });
     },
@@ -162,8 +162,8 @@ window.PartsModule = {
             </div>
         `;
 
-        window.UI.showModal('Ajuste de Estoque', formHtml, (formData) => {
-            window.db.update('parts', part.id, { quantity: formData.quantity });
+        window.UI.showModal('Ajuste de Estoque', formHtml, async (formData) => {
+            await window.db.update('parts', part.id, { quantity: formData.quantity });
             window.App.navigate('parts');
         }, 'Atualizar');
     }

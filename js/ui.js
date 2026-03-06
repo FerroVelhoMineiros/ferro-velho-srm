@@ -61,39 +61,52 @@ const UI = {
             setTimeout(() => modalOverlay.remove(), 300);
         }));
 
-        const saveAction = () => {
+        const saveAction = async () => {
             const form = document.getElementById('dynamic-form');
             if (form.checkValidity()) {
                 const formData = new FormData(form);
                 const data = Object.fromEntries(formData.entries());
 
-                // Immediately close modal and remove from DOM
-                // so that the callback (which re-renders the view) works cleanly
-                modalOverlay.classList.remove('active');
-                modalOverlay.remove();
+                // Set loading state on button
+                const originalText = saveBtn.innerHTML;
+                saveBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Salvando...';
+                saveBtn.disabled = true;
 
-                onSaveCallback(data);
+                try {
+                    // Start callback (which does the async db call)
+                    await onSaveCallback(data);
+                    
+                    // Immediately close modal and remove from DOM
+                    modalOverlay.classList.remove('active');
+                    setTimeout(() => modalOverlay.remove(), 300);
+                } catch (error) {
+                    console.error("Erro ao salvar:", error);
+                    alert(`Ocorreu um erro ao salvar os dados.\nDetalhes técnicos: ${error.message || error}`);
+                    saveBtn.innerHTML = originalText;
+                    saveBtn.disabled = false;
+                    isSubmitting = false;
+                }
             } else {
                 form.reportValidity();
+                isSubmitting = false;
             }
         };
 
         let isSubmitting = false;
 
-        saveBtn.addEventListener('click', (e) => {
+        saveBtn.addEventListener('click', async (e) => {
             if (isSubmitting) return;
             isSubmitting = true;
-            saveAction();
+            await saveAction();
             setTimeout(() => isSubmitting = false, 500);
         });
 
         const formElement = modalOverlay.querySelector('#dynamic-form');
-        formElement.addEventListener('submit', (e) => {
+        formElement.addEventListener('submit', async (e) => {
             e.preventDefault();
             if (isSubmitting) return;
             isSubmitting = true;
-            saveAction();
-            setTimeout(() => isSubmitting = false, 500);
+            await saveAction();
         });
 
         // Small delay to allow CSS animation

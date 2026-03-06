@@ -4,8 +4,16 @@
  */
 
 window.DashboardModule = {
-    render(container) {
-        const metrics = window.db.getDashboardMetrics();
+    async render(container) {
+        container.innerHTML = `
+            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px; color: var(--text-secondary);">
+                <i class="fa-solid fa-circle-notch fa-spin fa-3x" style="color: var(--primary-color); margin-bottom: 20px;"></i>
+                <h3 style="margin-bottom: 8px;">Conectando ao banco de dados...</h3>
+                <p>Isso pode levar alguns segundos se a nuvem estiver hibernando.</p>
+            </div>
+        `;
+
+        const metrics = await window.db.getDashboardMetrics();
 
         const contentHtml = `
             <div class="metrics-grid">
@@ -73,11 +81,11 @@ window.DashboardModule = {
             contentHtml
         );
 
-        this.renderAlerts();
+        await this.renderAlerts();
     },
 
-    renderAlerts() {
-        const tasks = window.db.get('maintenance');
+    async renderAlerts() {
+        const tasks = await window.db.get('maintenance');
         const pending = tasks.filter(t => t.status === 'Pendente').slice(0, 5); // top 5
         const tbody = document.getElementById('alerts-table-body');
 

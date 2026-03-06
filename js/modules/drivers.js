@@ -4,8 +4,8 @@
  */
 
 window.DriversModule = {
-    render(container) {
-        const drivers = window.db.get('drivers');
+    async render(container) {
+        const drivers = await window.db.get('drivers');
 
         let actionsHtml = `
             <button class="btn btn-primary" id="add-driver-btn">
@@ -71,19 +71,19 @@ window.DriversModule = {
         });
 
         document.querySelectorAll('.action-btn.edit').forEach(btn => {
-            btn.addEventListener('click', (e) => {
+            btn.addEventListener('click', async (e) => {
                 const id = e.currentTarget.getAttribute('data-id');
-                const driver = window.db.getById('drivers', id);
+                const driver = await window.db.getById('drivers', id);
                 if (driver) this.openDriverModal(driver);
             });
         });
 
         document.querySelectorAll('.action-btn.delete').forEach(btn => {
-            btn.addEventListener('click', (e) => {
+            btn.addEventListener('click', async (e) => {
                 const id = e.currentTarget.getAttribute('data-id');
 
                 // Verify if driver is linked to any active vehicle before deleting
-                const vehicles = window.db.get('vehicles');
+                const vehicles = await window.db.get('vehicles');
                 const linkedToVehicle = vehicles.some(v => v.driverId === id);
 
                 if (linkedToVehicle) {
@@ -92,7 +92,7 @@ window.DriversModule = {
                 }
 
                 if (confirm('Tem certeza que deseja remover este motorista?')) {
-                    window.db.delete('drivers', id);
+                    await window.db.delete('drivers', id);
                     window.App.navigate('drivers');
                 }
             });
@@ -147,11 +147,11 @@ window.DriversModule = {
             </div>
         `;
 
-        window.UI.showModal(title, formHtml, (formData) => {
+        window.UI.showModal(title, formHtml, async (formData) => {
             if (driverToEdit) {
-                window.db.update('drivers', driverToEdit.id, formData);
+                await window.db.update('drivers', driverToEdit.id, formData);
             } else {
-                window.db.add('drivers', formData);
+                await window.db.add('drivers', formData);
             }
             window.App.navigate('drivers');
         });

@@ -4,9 +4,9 @@
  */
 
 window.MaintenanceModule = {
-    render(container) {
-        const tasks = window.db.get('maintenance');
-        const vehicles = window.db.get('vehicles');
+    async render(container) {
+        const tasks = await window.db.get('maintenance');
+        const vehicles = await window.db.get('vehicles');
         const vehicleMap = {};
         vehicles.forEach(v => vehicleMap[v.id] = v.plate);
 
@@ -65,18 +65,18 @@ window.MaintenanceModule = {
         document.getElementById('add-maint-btn')?.addEventListener('click', () => this.openFormModal());
 
         document.querySelectorAll('.action-btn.edit').forEach(btn => {
-            btn.addEventListener('click', (e) => {
+            btn.addEventListener('click', async (e) => {
                 const id = e.currentTarget.getAttribute('data-id');
-                const task = window.db.getById('maintenance', id);
+                const task = await window.db.getById('maintenance', id);
                 if (task) this.openCompleteModal(task);
             });
         });
 
         document.querySelectorAll('.action-btn.delete').forEach(btn => {
-            btn.addEventListener('click', (e) => {
+            btn.addEventListener('click', async (e) => {
                 const id = e.currentTarget.getAttribute('data-id');
                 if (confirm('Excluir registro de manutenção?')) {
-                    window.db.delete('maintenance', id);
+                    await window.db.delete('maintenance', id);
                     window.App.navigate('maintenance');
                     window.App.updateAlerts();
                 }
@@ -84,8 +84,8 @@ window.MaintenanceModule = {
         });
     },
 
-    openFormModal() {
-        const vehicles = window.db.get('vehicles');
+    async openFormModal() {
+        const vehicles = await window.db.get('vehicles');
         if (vehicles.length === 0) { alert('Você precisa de veículos cadastrados.'); return; }
 
         const vehicleOptions = vehicles.map(v => `<option value="${v.id}">${v.plate} (Km atual: ${v.mileage})</option>`).join('');
@@ -139,23 +139,31 @@ window.MaintenanceModule = {
             </div>
         `;
 
-        window.UI.showModal('Nova Manutenção', formHtml, (formData) => {
-            const v = window.db.getById('vehicles', formData.vehicleId);
+        window.UI.showModal('Nova Manutenção', formHtml, async (formData) => {
+            const v = await window.db.getById('vehicles', formData.vehicleId);
             const dataToSave = {
                 ...formData,
                 vehiclePlate: v ? v.plate : 'Desconhecido'
             };
-            window.db.add('maintenance', dataToSave);
+            await window.db.add('maintenance', dataToSave);
             window.App.updateAlerts();
             window.App.navigate('maintenance');
         });
     },
 
-    openCompleteModal(task) {
+    async openCompleteModal(task) {
+        const partsList = await window.db.get('parts');
+        
+        // Filter out parts with 0 stock
+        const validParts = partsList.filter(p => Number(p.quantity) > 0);
+        const partsOptions = validParts.map(p => 
+            `<option value="${p.id}" data-price="${p.price}" data-max="${p.quantity}">[${p.code}] ${p.name} (Estoque: ${p.quantity} - R$ ${p.price})</option>`
+        ).join('');
+
         const formHtml = `
             <div style="margin-bottom: 20px;">
                 <p style="font-size: 0.95rem;">Completando: <strong>${task.service}</strong></p>
-                <p style="font-size: 0.85rem; color: var(--text-secondary);">Mude o status para concluído e ajuste o valor final se necessário.</p>
+                <p style="font-size: 0.85rem; color: var(--text-secondary);">Mude o status para concluído e informe as peças utilizadas.</p>
             </div>
              <div class="form-group">
                 <label>Status</label>
@@ -164,18 +172,124 @@ window.MaintenanceModule = {
                     <option value="Em Andamento">Continuar Em Andamento</option>
                 </select>
             </div>
+            
+            <hr style="margin: 20px 0; border: 0; border-top: 1px solid var(--border-color);">
+            <p style="font-weight: 500; margin-bottom: 12px; font-size: 0.9rem;">Peças Usadas do Estoque</p>
+            
+            <div id="parts-container">
+                <div class="part-row" style="display: flex; gap: 8px; margin-bottom: 8px;">
+                    <select class="form-control part-select" style="flex: 2;">
+                        <option value="">-- Nenhuma peça --</option>
+                        ${partsOptions}
+                    </select>
+                    <input type="number" class="form-control part-qty" placeholder="Qtd" min="1" value="1" style="flex: 1;">
+                </div>
+            </div>
+            <button type="button" id="add-part-row-btn" class="btn" style="padding: 4px 8px; font-size: 0.8rem; margin-bottom: 16px;"><i class="fa-solid fa-plus"></i> Adicionar outra peça</button>
+
              <div class="form-group">
-                <label>Valor Final Fechado (R$)</label>
-                <input type="number" class="form-control" name="cost" step="0.01" value="${task.cost || 0}">
+                <label>Valor Mão de Obra / Serviço Extra (R$)</label>
+                <input type="number" class="form-control" id="calc-service-cost" step="0.01" value="${task.cost || 0}">
+            </div>
+            
+             <div class="form-group" style="background: var(--bg-hover); padding: 12px; border-radius: 6px; border: 1px solid var(--border-color);">
+                <label>Valor Final Total (Peças + Serviço)</label>
+                <input type="number" class="form-control" name="cost" id="calc-total-cost" step="0.01" value="${task.cost || 0}" style="font-weight: bold; color: var(--primary-color);">
             </div>
         `;
 
-        window.UI.showModal('Finalizar Serviço', formHtml, (formData) => {
-            window.db.update('maintenance', task.id, formData);
+        // Render modal but hijack normal UI.showModal since we need DOM manipulation after insertion
+        window.UI.showModal('Finalizar Serviço', formHtml, async (formData) => {
+            const container = document.getElementById('parts-container');
+            const rows = container.querySelectorAll('.part-row');
+            
+            let usedPartsData = [];
+            
+            // Collect parts and deduct stock
+            for (let row of rows) {
+                const select = row.querySelector('.part-select');
+                const qtyInput = row.querySelector('.part-qty');
+                const partId = select.value;
+                const qty = Number(qtyInput.value) || 0;
+                
+                if (partId && qty > 0) {
+                    const originalPart = await window.db.getById('parts', partId);
+                    if (originalPart) {
+                        const newStock = Math.max(0, Number(originalPart.quantity) - qty);
+                        await window.db.update('parts', partId, { quantity: newStock });
+                        
+                        usedPartsData.push({
+                            id: partId,
+                            name: originalPart.name,
+                            code: originalPart.code,
+                            qtyUsed: qty,
+                            unitPrice: originalPart.price
+                        });
+                    }
+                }
+            }
+            
+            // Append used parts history to the task description or a new field
+            if (usedPartsData.length > 0) {
+                let partsLog = usedPartsData.map(p => `${p.qtyUsed}x ${p.name}`).join(', ');
+                formData.service = `${task.service} (Peças: ${partsLog})`;
+            }
 
-            // Should prompt vehicle status change to active maybe, keep it simple for now
+            await window.db.update('maintenance', task.id, formData);
+
             window.App.updateAlerts();
             window.App.navigate('maintenance');
         }, 'Finalizar');
+        
+        // Wait for modal to be in DOM
+        setTimeout(() => {
+            const addBtn = document.getElementById('add-part-row-btn');
+            const container = document.getElementById('parts-container');
+            const serviceCostInput = document.getElementById('calc-service-cost');
+            const totalCostInput = document.getElementById('calc-total-cost');
+            
+            const calculateTotal = () => {
+                let partsTotal = 0;
+                container.querySelectorAll('.part-row').forEach(row => {
+                    const select = row.querySelector('.part-select');
+                    const qty = Number(row.querySelector('.part-qty').value) || 0;
+                    if (select.value && select.selectedOptions[0]) {
+                        const price = Number(select.selectedOptions[0].getAttribute('data-price')) || 0;
+                        partsTotal += (price * qty);
+                    }
+                });
+                const serviceTotal = Number(serviceCostInput.value) || 0;
+                totalCostInput.value = (partsTotal + serviceTotal).toFixed(2);
+            };
+
+            addBtn?.addEventListener('click', () => {
+                const newRow = document.createElement('div');
+                newRow.className = 'part-row';
+                newRow.style.cssText = 'display: flex; gap: 8px; margin-bottom: 8px;';
+                newRow.innerHTML = `
+                    <select class="form-control part-select" style="flex: 2;">
+                        <option value="">-- Nenhuma peça --</option>
+                        ${partsOptions}
+                    </select>
+                    <input type="number" class="form-control part-qty" placeholder="Qtd" min="1" value="1" style="flex: 1;">
+                    <button type="button" class="btn remove-part-btn" style="background: var(--danger-color); color: white; border: none; padding: 0 10px; border-radius: 4px;"><i class="fa-solid fa-xmark"></i></button>
+                `;
+                container.appendChild(newRow);
+                
+                newRow.querySelector('.remove-part-btn').addEventListener('click', () => {
+                    newRow.remove();
+                    calculateTotal();
+                });
+                
+                newRow.querySelector('.part-select').addEventListener('change', calculateTotal);
+                newRow.querySelector('.part-qty').addEventListener('input', calculateTotal);
+            });
+            
+            // Attach calculation to first row 
+            container.querySelector('.part-select')?.addEventListener('change', calculateTotal);
+            container.querySelector('.part-qty')?.addEventListener('input', calculateTotal);
+            serviceCostInput?.addEventListener('input', calculateTotal);
+            
+        }, 300);
     }
 };

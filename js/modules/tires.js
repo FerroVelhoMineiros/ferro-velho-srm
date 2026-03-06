@@ -4,19 +4,17 @@
  */
 
 window.TiresModule = {
-    render(container) {
-        const tires = window.db.get('tires');
-        const vehicles = window.db.get('vehicles');
+    async render(container) {
+        const tires = await window.db.get('tires');
+        const vehicles = await window.db.get('vehicles');
         const vehicleMap = {};
         vehicles.forEach(v => vehicleMap[v.id] = v.plate);
 
-        let actionsHtml = `<button class="btn btn-primary" id="add-tire-btn"><i class="fa-solid fa-plus"></i> Cadastrar Pneu</button>`;
+        let actionsHtml = `<button class="btn btn-primary" id="add-tire-btn"><i class="fa-solid fa-plus"></i> Instalar Pneu</button>`;
 
         let tableRows = tires.map(t => {
-            const usage = ((t.currentKm / t.lifeSpanKm) * 100).toFixed(0);
-            let statusBadge = usage > 85 ? '<span class="status-badge status-inactive">Troca Urgente</span>' :
-                usage > 60 ? '<span class="status-badge status-maintenance">Em Uso</span>' :
-                    '<span class="status-badge status-active">Bom Estado</span>';
+            let statusBadge = t.vehicleId ? '<span class="status-badge status-maintenance">Em Uso</span>' :
+                '<span class="status-badge status-active">Estoque</span>';
 
             return `
             <tr>
@@ -24,12 +22,7 @@ window.TiresModule = {
                 <td>${t.brand}</td>
                 <td>${t.size}</td>
                 <td>${vehicleMap[t.vehicleId] || 'Estoque'} - ${t.position}</td>
-                <td>
-                    <div style="background: var(--bg-main); border-radius: 4px; height: 8px; width: 100%; margin-bottom: 4px; overflow: hidden;">
-                        <div style="background: ${usage > 85 ? 'var(--danger-color)' : usage > 60 ? 'var(--warning-color)' : 'var(--success-color)'}; width: ${usage}%; height: 100%;"></div>
-                    </div>
-                    <small style="color: var(--text-secondary)">${t.currentKm} / ${t.lifeSpanKm} km (${usage}%)</small>
-                </td>
+                <td>${t.observations || '-'}</td>
                 <td>${statusBadge}</td>
                 <td>
                     <button class="action-btn delete" data-id="${t.id}" title="Descartar"><i class="fa-solid fa-trash"></i></button>
@@ -51,7 +44,7 @@ window.TiresModule = {
                             <th>Marca</th>
                             <th>Medida</th>
                             <th>Alocação (Veículo - Eixo)</th>
-                            <th>Desgaste (Vida Útil)</th>
+                            <th>Observações</th>
                             <th>Status</th>
                             <th>Ações</th>
                         </tr>
@@ -69,18 +62,18 @@ window.TiresModule = {
         document.getElementById('add-tire-btn')?.addEventListener('click', () => this.openFormModal());
 
         document.querySelectorAll('.action-btn.delete').forEach(btn => {
-            btn.addEventListener('click', (e) => {
+            btn.addEventListener('click', async (e) => {
                 const id = e.currentTarget.getAttribute('data-id');
                 if (confirm('Tem certeza que deseja remover este pneu do sistema?')) {
-                    window.db.delete('tires', id);
+                    await window.db.delete('tires', id);
                     window.App.navigate('tires');
                 }
             });
         });
     },
 
-    openFormModal() {
-        const vehicles = window.db.get('vehicles');
+    async openFormModal() {
+        const vehicles = await window.db.get('vehicles');
         const vehicleOptions = `<option value="">Manter em Estoque</option>` + vehicles.map(v => `<option value="${v.id}">${v.plate}</option>`).join('');
 
         const formHtml = `
@@ -99,14 +92,10 @@ window.TiresModule = {
                     <label>Medida</label>
                     <input type="text" class="form-control" name="size" required placeholder="Ex: 275/80 R22.5">
                 </div>
-                <div class="form-group" style="flex: 1;">
-                    <label>Vida Útil Estimada (Km)</label>
-                    <input type="number" class="form-control" name="lifeSpanKm" required value="100000">
-                </div>
             </div>
             <div class="form-group">
-                <label>Km Rodados Anteriormente (Opcional)</label>
-                <input type="number" class="form-control" name="currentKm" value="0">
+                <label>Observações</label>
+                <textarea class="form-control" name="observations" rows="2" placeholder="Ex: Pneu recapado, avaria lateral..."></textarea>
             </div>
             <hr style="margin: 20px 0; border: 0; border-top: 1px solid var(--border-color);">
             <div style="display: flex; gap: 16px;">
@@ -134,8 +123,8 @@ window.TiresModule = {
             </div>
         `;
 
-        window.UI.showModal('Cadastrar Novo Pneu', formHtml, (formData) => {
-            window.db.add('tires', formData);
+        window.UI.showModal('Instalar Pneu', formHtml, async (formData) => {
+            await window.db.add('tires', formData);
             window.App.navigate('tires');
         });
     }

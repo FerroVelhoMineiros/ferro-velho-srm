@@ -1,160 +1,134 @@
 /**
  * Storage Manager
- * Handles data persistence using localStorage
+ * Handles data persistence using the backend Node API connected to PostgreSQL
  */
 
 class StorageManager {
     constructor() {
         this.collections = ['vehicles', 'fuel', 'tires', 'parts', 'maintenance', 'drivers'];
-        this.initializeData();
-    }
-
-    // Ensure all collections exist in localStorage
-    initializeData() {
-        this.collections.forEach(collection => {
-            if (!localStorage.getItem(`fc_${collection}`)) {
-                localStorage.setItem(`fc_${collection}`, JSON.stringify([]));
-            }
-        });
-
-        // Populate with some mock data if empty (for demonstration)
-        this.seedMockData();
-    }
-
-    seedMockData() {
-        const vehicles = this.get('vehicles');
-        if (vehicles.length === 0) {
-            this.add('vehicles', {
-                plate: 'ABC-1234',
-                model: 'Volkswagen Delivery 9.170',
-                year: '2022',
-                status: 'Ativo',
-                mileage: 45000,
-                type: 'Caminhão Leve'
-            });
-            this.add('vehicles', {
-                plate: 'XYZ-9876',
-                model: 'Mercedes-Benz Sprinter',
-                year: '2021',
-                status: 'Em Manutenção',
-                mileage: 120500,
-                type: 'Van'
-            });
-            this.add('vehicles', {
-                plate: 'DEF-5678',
-                model: 'Fiat Fiorino',
-                year: '2023',
-                status: 'Ativo',
-                mileage: 12000,
-                type: 'Furgão Base'
-            });
-        }
-
-        const drivers = this.get('drivers');
-        if (drivers.length === 0) {
-            this.add('drivers', {
-                name: 'João Silva',
-                cnh: '12345678901',
-                category: 'E',
-                phone: '(11) 98765-4321',
-                status: 'Ativo'
-            });
-            this.add('drivers', {
-                name: 'Carlos Oliveira',
-                cnh: '98765432109',
-                category: 'D',
-                phone: '(11) 91234-5678',
-                status: 'Ativo'
-            });
-            this.add('drivers', {
-                name: 'Ana Costa',
-                cnh: '45678912300',
-                category: 'B',
-                phone: '(11) 99999-8888',
-                status: 'Inativo'
-            });
-        }
+        // Define base URL for local or production
+        const origin = window.location.origin;
+        this.baseUrl = (origin.includes('localhost') || origin.includes('127.0.0.1') || origin.includes('file://') || window.location.protocol === 'file:') 
+            ? 'http://localhost:3000' 
+            : '';
     }
 
     // Get all items from a collection
-    get(collection) {
+    async get(collection) {
         try {
-            const data = localStorage.getItem(`fc_${collection}`);
-            return data ? JSON.parse(data) : [];
+            // Use no-store cache or cache-busting so the UI always gets fresh data
+            const response = await fetch(`${this.baseUrl}/api/${collection}?v=${Date.now()}`, {
+                cache: 'no-store'
+            });
+            if (!response.ok) throw new Error(`Failed to fetch ${collection}`);
+            return await response.json();
         } catch (e) {
-            console.error(`Error reading ${collection} from storage`, e);
+            console.error(`Error reading ${collection} from API`, e);
             return [];
         }
     }
 
     // Get a specific item by ID
-    getById(collection, id) {
-        const items = this.get(collection);
-        return items.find(item => item.id === id) || null;
+    async getById(collection, id) {
+        try {
+            const response = await fetch(`${this.baseUrl}/api/${collection}/${id}?v=${Date.now()}`, {
+                cache: 'no-store'
+            });
+            if (!response.ok) throw new Error(`Failed to fetch ${collection} item ${id}`);
+            return await response.json();
+        } catch (e) {
+            console.error(`Error reading ${collection} item from API`, e);
+            return null;
+        }
     }
 
     // Add a new item to a collection
-    add(collection, data) {
-        const items = this.get(collection);
-        const newItem = {
-            id: Date.now().toString(36) + Math.random().toString(36).substr(2),
-            createdAt: new Date().toISOString(),
-            ...data
-        };
-        items.push(newItem);
-        this.save(collection, items);
-        return newItem;
+    async add(collection, data) {
+        try {
+            const response = await fetch(`${this.baseUrl}/api/${collection}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            if (!response.ok) throw new Error(`Failed to add to ${collection}`);
+            return await response.json();
+        } catch (e) {
+            console.error(`Error adding to ${collection}`, e);
+            throw e;
+        }
     }
 
     // Update an existing item
-    update(collection, id, data) {
-        const items = this.get(collection);
-        const index = items.findIndex(item => item.id === id);
-
-        if (index !== -1) {
-            items[index] = { ...items[index], ...data, updatedAt: new Date().toISOString() };
-            this.save(collection, items);
-            return items[index];
+    async update(collection, id, data) {
+        try {
+            const response = await fetch(`${this.baseUrl}/api/${collection}/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            if (!response.ok) throw new Error(`Failed to update ${collection} item ${id}`);
+            return await response.json();
+        } catch (e) {
+            console.error(`Error updating ${collection}`, e);
+            throw e;
         }
-        return null;
     }
 
     // Delete an item
-    delete(collection, id) {
-        const items = this.get(collection);
-        const filteredItems = items.filter(item => item.id !== id);
-        this.save(collection, filteredItems);
-        return true;
+    async delete(collection, id) {
+        try {
+            const response = await fetch(`${this.baseUrl}/api/${collection}/${id}`, {
+                method: 'DELETE'
+            });
+            if (!response.ok) throw new Error(`Failed to delete ${collection} item ${id}`);
+            return true;
+        } catch (e) {
+            console.error(`Error deleting from ${collection}`, e);
+            throw e;
+        }
     }
 
-    // Override collection directly
-    save(collection, data) {
-        localStorage.setItem(`fc_${collection}`, JSON.stringify(data));
+    // Save completely overrides a collection (Not recommended for API, keeping for compatibility if ever needed)
+    async save(collection, data) {
+        console.warn('save() is deprecated. Please use add(), update(), or delete() instead.');
     }
 
     // Calculate total summary metrics
-    getDashboardMetrics() {
-        const vehicles = this.get('vehicles');
-        const fuel = this.get('fuel');
-        const tasks = this.get('maintenance');
+    async getDashboardMetrics() {
+        try {
+            const [vehicles, fuel, tasks] = await Promise.all([
+                this.get('vehicles'),
+                this.get('fuel'),
+                this.get('maintenance')
+            ]);
+            
+            const activeVehicles = vehicles.filter(v => v.status === 'Ativo').length;
+            const maintenanceVehicles = vehicles.filter(v => v.status === 'Em Manutenção').length;
 
-        const activeVehicles = vehicles.filter(v => v.status === 'Ativo').length;
-        const maintenanceVehicles = vehicles.filter(v => v.status === 'Em Manutenção').length;
+            const pendingTasks = tasks.filter(t => t.status === 'Pendente').length;
 
-        const pendingTasks = tasks.filter(t => t.status === 'Pendente').length;
+            const totalFuelCost = fuel.reduce((acc, curr) => acc + (Number(curr.totalCost) || 0), 0);
+            const totalMaintenanceCost = tasks.reduce((acc, curr) => acc + (Number(curr.cost) || 0), 0);
 
-        const totalFuelCost = fuel.reduce((acc, curr) => acc + (Number(curr.totalCost) || 0), 0);
-        // Considerando agendamentos concluídos ou em andamento que preencheram o custo
-        const totalMaintenanceCost = tasks.reduce((acc, curr) => acc + (Number(curr.cost) || 0), 0);
-
-        return {
-            totalVehicles: vehicles.length,
-            activeVehicles,
-            maintenanceVehicles,
-            pendingTasks,
-            totalFuelCost,
-            totalMaintenanceCost
-        };
+            return {
+                totalVehicles: vehicles.length,
+                activeVehicles,
+                maintenanceVehicles,
+                pendingTasks,
+                totalFuelCost,
+                totalMaintenanceCost
+            };
+        } catch (e) {
+            console.error('Error fetching dashboard metrics', e);
+            return {
+                totalVehicles: 0,
+                activeVehicles: 0,
+                maintenanceVehicles: 0,
+                pendingTasks: 0,
+                totalFuelCost: 0,
+                totalMaintenanceCost: 0
+            };
+        }
     }
 }
 

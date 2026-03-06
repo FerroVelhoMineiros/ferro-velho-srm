@@ -63,19 +63,26 @@ const App = {
         }
     },
 
-    updateAlerts() {
+    async updateAlerts() {
         const badge = document.getElementById('alertBadge');
-        const tasks = window.db.get('maintenance');
-        const pending = tasks.filter(t => t.status === 'Pendente');
+        try {
+            const tasks = await window.db.get('maintenance');
+            const pending = tasks.filter(t => t.status === 'Pendente');
 
-        if (pending.length > 0) {
-            badge.style.display = 'flex';
-            badge.innerText = pending.length;
-        } else {
+            if (pending.length > 0) {
+                badge.style.display = 'flex';
+                badge.innerText = pending.length;
+            } else {
+                badge.style.display = 'none';
+            }
+        } catch (e) {
             badge.style.display = 'none';
         }
     }
 };
+
+// Expose globally for modules to use
+window.App = App;
 
 // Wait for DOM to load fully before initializing
 document.addEventListener('DOMContentLoaded', () => {
