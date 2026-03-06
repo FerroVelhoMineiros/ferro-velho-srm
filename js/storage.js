@@ -1,90 +1,38 @@
 /**
- * Storage Manager
- * Handles data persistence using localStorage
+ * Storage Manager (API Version)
+ * Handles data persistence communicating with Node.js Backend
+ * Uses an in-memory cache for synchronous reads to preserve UI compatibility
  */
 
 class StorageManager {
     constructor() {
         this.collections = ['vehicles', 'fuel', 'tires', 'parts', 'maintenance', 'drivers'];
-        this.initializeData();
+        this.cache = {};
+        this.apiUrl = 'http://localhost:3000/api';
     }
 
-    // Ensure all collections exist in localStorage
-    initializeData() {
-        this.collections.forEach(collection => {
-            if (!localStorage.getItem(`fc_${collection}`)) {
-                localStorage.setItem(`fc_${collection}`, JSON.stringify([]));
+    // Load everything from API once on startup
+    async loadAllData() {
+        console.log("Loading data from PostgreSQL/API...");
+        for (const collection of this.collections) {
+            try {
+                const res = await fetch(`${this.apiUrl}/${collection}`);
+                if (res.ok) {
+                    this.cache[collection] = await res.json();
+                } else {
+                    this.cache[collection] = [];
+                }
+            } catch (e) {
+                console.error(`API offline ou erro no CORS. Coleção: ${collection}`, e);
+                this.cache[collection] = [];
             }
-        });
-
-        // Populate with some mock data if empty (for demonstration)
-        this.seedMockData();
+        }
+        console.log("Data loaded successfully!");
     }
 
-    seedMockData() {
-        const vehicles = this.get('vehicles');
-        if (vehicles.length === 0) {
-            this.add('vehicles', {
-                plate: 'ABC-1234',
-                model: 'Volkswagen Delivery 9.170',
-                year: '2022',
-                status: 'Ativo',
-                mileage: 45000,
-                type: 'Caminhão Leve'
-            });
-            this.add('vehicles', {
-                plate: 'XYZ-9876',
-                model: 'Mercedes-Benz Sprinter',
-                year: '2021',
-                status: 'Em Manutenção',
-                mileage: 120500,
-                type: 'Van'
-            });
-            this.add('vehicles', {
-                plate: 'DEF-5678',
-                model: 'Fiat Fiorino',
-                year: '2023',
-                status: 'Ativo',
-                mileage: 12000,
-                type: 'Furgão Base'
-            });
-        }
-
-        const drivers = this.get('drivers');
-        if (drivers.length === 0) {
-            this.add('drivers', {
-                name: 'João Silva',
-                cnh: '12345678901',
-                category: 'E',
-                phone: '(11) 98765-4321',
-                status: 'Ativo'
-            });
-            this.add('drivers', {
-                name: 'Carlos Oliveira',
-                cnh: '98765432109',
-                category: 'D',
-                phone: '(11) 91234-5678',
-                status: 'Ativo'
-            });
-            this.add('drivers', {
-                name: 'Ana Costa',
-                cnh: '45678912300',
-                category: 'B',
-                phone: '(11) 99999-8888',
-                status: 'Inativo'
-            });
-        }
-    }
-
-    // Get all items from a collection
+    // Get all items from a collection (Returns from Cache synchronously)
     get(collection) {
-        try {
-            const data = localStorage.getItem(`fc_${collection}`);
-            return data ? JSON.parse(data) : [];
-        } catch (e) {
-            console.error(`Error reading ${collection} from storage`, e);
-            return [];
-        }
+        return this.cache[collection] || [];
     }
 
     // Get a specific item by ID
@@ -93,43 +41,74 @@ class StorageManager {
         return items.find(item => item.id === id) || null;
     }
 
-    // Add a new item to a collection
+    // Add a new item
     add(collection, data) {
-        const items = this.get(collection);
+        // Optimistic UI Update (Immediate feedback)
+        const tempId = 'temp_' + Date.now();
         const newItem = {
-            id: Date.now().toString(36) + Math.random().toString(36).substr(2),
+            id: tempId,
             createdAt: new Date().toISOString(),
             ...data
         };
-        items.push(newItem);
-        this.save(collection, items);
+
+        if (!this.cache[collection]) this.cache[collection] = [];
+        this.cache[collection].push(newItem);
+
+        // Async API Call
+        fetch(`${this.apiUrl}/${collection}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        })
+            .then(res => res.json())
+            .then(savedItem => {
+                // Replace optimistic data with real database data
+                const idx = this.cache[collection].findIndex(i => i.id === tempId);
+                if (idx !== -1) {
+                    this.cache[collection][idx] = savedItem;
+                }
+            })
+            .catch(e => console.error("Error saving to API", e));
+
         return newItem;
     }
 
     // Update an existing item
     update(collection, id, data) {
+        // Optimistic UI Update
         const items = this.get(collection);
         const index = items.findIndex(item => item.id === id);
 
         if (index !== -1) {
-            items[index] = { ...items[index], ...data, updatedAt: new Date().toISOString() };
-            this.save(collection, items);
-            return items[index];
+            this.cache[collection][index] = {
+                ...this.cache[collection][index],
+                ...data,
+                updatedAt: new Date().toISOString()
+            };
+
+            // Async API Call
+            fetch(`${this.apiUrl}/${collection}/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            }).catch(e => console.error("Error updating API", e));
+
+            return this.cache[collection][index];
         }
         return null;
     }
 
     // Delete an item
     delete(collection, id) {
-        const items = this.get(collection);
-        const filteredItems = items.filter(item => item.id !== id);
-        this.save(collection, filteredItems);
-        return true;
-    }
+        // Optimistic UI Update
+        this.cache[collection] = this.cache[collection].filter(item => item.id !== id);
 
-    // Override collection directly
-    save(collection, data) {
-        localStorage.setItem(`fc_${collection}`, JSON.stringify(data));
+        // Async API Call
+        fetch(`${this.apiUrl}/${collection}/${id}`, {
+            method: 'DELETE'
+        }).catch(e => console.error("Error deleting API", e));
+
+        return true;
     }
 
     // Calculate total summary metrics
@@ -144,7 +123,6 @@ class StorageManager {
         const pendingTasks = tasks.filter(t => t.status === 'Pendente').length;
 
         const totalFuelCost = fuel.reduce((acc, curr) => acc + (Number(curr.totalCost) || 0), 0);
-        // Considerando agendamentos concluídos ou em andamento que preencheram o custo
         const totalMaintenanceCost = tasks.reduce((acc, curr) => acc + (Number(curr.cost) || 0), 0);
 
         return {

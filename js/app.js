@@ -78,10 +78,18 @@ const App = {
 };
 
 // Wait for DOM to load fully before initializing
-document.addEventListener('DOMContentLoaded', () => {
-    // We expect the script tags to load modules and place them in `window`.
-    // We give a tiny delay to ensure all modules are attached.
-    setTimeout(() => {
-        App.init();
-    }, 100);
+document.addEventListener('DOMContentLoaded', async () => {
+    // Show a global loading state while fetching from PostgreSQL
+    document.getElementById('views-container').innerHTML = `
+        <div class="loading-state">
+            <i class="fa-solid fa-cloud-arrow-down fa-bounce" style="font-size: 3rem; color: var(--primary-color);"></i>
+            <p style="margin-top: 15px;">Conectando ao Banco de Dados...</p>
+        </div>
+    `;
+
+    // Load all data from API
+    await window.db.loadAllData();
+
+    // Initialize the application routing
+    App.init();
 });
