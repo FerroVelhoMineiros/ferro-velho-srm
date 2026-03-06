@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SRM | Ferro Velho dos Mineiros</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="css/main-dashboard.css">
+</head>
+
+<body>
+    <header class="dashboard-header">
+        <h1>Ferro Velho dos Mineiros</h1>
+        <p>Sistema de Gestão Integrada (SRM/ERP)</p>
+    </header>
+
+    <main class="modules-grid">
+        <!-- Module 1: Active -->
+        <a href="frota.html" class="module-card container-active">
+            <span class="badge active">Disponível</span>
+            <div class="module-icon">
+                <i class="fa-solid fa-truck-fast"></i>
+            </div>
+            <h2 class="module-title">Controle de Frota</h2>
+            <p class="module-desc">Gestão completa de veículos, manutenções, peças, pneus e abastecimentos.</p>
+        </a>
+
+        <!-- Module 2: Disabled -->
+        <div class="module-card disabled">
+            <span class="badge">Em Breve</span>
+            <div class="module-icon">
+                <i class="fa-solid fa-boxes-stacked"></i>
+            </div>
+            <h2 class="module-title">Estoque / Peças</h2>
+            <p class="module-desc">Controle de inventário, organização do pátio e categorização de peças de desmonte.
+            </p>
+        </div>
+
+        <!-- Module 3: Disabled -->
+        <div class="module-card disabled">
+            <span class="badge">Em Breve</span>
+            <div class="module-icon">
+                <i class="fa-solid fa-users"></i>
+            </div>
+            <h2 class="module-title">Clientes e Fornecedores</h2>
+            <p class="module-desc">Gestão de contatos, fornecedores de sucata e histórico de relacionamento.</p>
+        </div>
+
+        <!-- Module 4: Disabled -->
+        <div class="module-card disabled">
+            <span class="badge">Em Breve</span>
+            <div class="module-icon">
+                <i class="fa-solid fa-handshake"></i>
+            </div>
+            <h2 class="module-title">Vendas e Compras</h2>
+            <p class="module-desc">Emissão de orçamentos, registro de negociações e recibos de compra e venda.</p>
+        </div>
+
+        <!-- Module 5: Disabled -->
+        <div class="module-card disabled">
+            <span class="badge">Em Breve</span>
+            <div class="module-icon">
+                <i class="fa-solid fa-chart-line"></i>
+            </div>
+            <h2 class="module-title">Financeiro</h2>
+            <p class="module-desc">Fluxo de caixa diário, contas a pagar, contas a receber e dre simplificado.</p>
+        </div>
+    </main>
+</body>
+
+</html>
