@@ -24,8 +24,8 @@ const AppConciliacao = {
             notas_fiscais: { render: this.renderWIP },
             caminhoes: { render: this.renderWIP },
             viagens: { render: this.renderWIP },
-            importacao: { render: this.renderWIP },
-            conciliacao_notas: { render: this.renderWIP },
+            importacao: window.ImportacaoModule,
+            conciliacao_notas: window.ConciliacaoNotasModule,
             impurezas: { render: this.renderWIP },
             financeiro_gerdau: { render: this.renderWIP },
             relatorios: { render: this.renderWIP }
