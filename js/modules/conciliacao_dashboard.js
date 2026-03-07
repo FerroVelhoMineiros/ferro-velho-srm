@@ -192,10 +192,20 @@ window.DashboardConciliacaoModule = {
         // Proteção contra divisão por zero
         const percentualPerdaVisaoGeral = totalEnviadoKg > 0 ? ((totalPerdaKg / totalEnviadoKg) * 100).toFixed(2) : 0;
 
-        // Preço médio ponderado exibído no card de sucata
-        const precoMedioExibicao = totalEnviadoKg > 0
-            ? (valorSygecomTotalComImposto / totalEnviadoKg)
-            : globalPriceFallback;
+        // Preço exibido no card: lido direto do configMap (o que o usuário definiu)
+        // Mês filtrado: usa o preço específico ou cai no GLOBAL
+        // Visão global: usa o GLOBAL (ou a média simples se tiver múltiplos)
+        let precoMedioExibicao;
+        if (mesFiltro) {
+            precoMedioExibicao = configMap[mesFiltro] !== undefined
+                ? configMap[mesFiltro]
+                : (configMap['GLOBAL'] || globalPriceFallback);
+        } else {
+            // Média ponderada real: soma(peso * preco_do_mes) / peso_total_enviado
+            precoMedioExibicao = totalEnviadoKg > 0
+                ? (valorTotalPrejuizoCaixa + valorGerdauTotalPago) / (totalEnviadoKg * 1.12)
+                : (configMap['GLOBAL'] || globalPriceFallback);
+        }
 
         // Resultado: positivo = lucro (Gerdau deve devolver), negativo = prejuízo
         const isLucro = valorTotalPrejuizoCaixa >= 0;
