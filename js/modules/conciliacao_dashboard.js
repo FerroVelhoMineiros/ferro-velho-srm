@@ -193,6 +193,9 @@ window.DashboardConciliacaoModule = {
 
             // === FÓRMULA DO RESULTADO DE CAIXA (SÓ CONTA SE AINDA NÃO FOI COMPENSADA) ===
             if (n.status_conciliacao !== 'Pendente Gerdau' && n.status_conciliacao !== 'Falta no Sygecom') {
+                // NOTAS DE 1 KG: Ignorar no cálculo do resultado (são ajustes técnicos já resolvidos)
+                if (pesoRecebido === 1) return;
+
                 const icmsMult = n.status_conciliacao === 'Baixa Manual' ? 1 : 1.12;
                 const valorEsperado = pesoRecebido * precoMes * icmsMult;
                 const resultado = valorEsperado - valorGerPago;
