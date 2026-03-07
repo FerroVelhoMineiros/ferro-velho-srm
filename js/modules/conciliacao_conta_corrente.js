@@ -253,8 +253,9 @@ window.ContaCorrenteModule = {
         const numero_nota = document.getElementById('cc-nota')?.value;
         const valor_gerdau = document.getElementById('cc-gerdau')?.value;
 
-        if (!tipo || !data || isNaN(valor) || valor <= 0) {
-            alert('Preencha os campos obrigatórios: Tipo, Data e Valor.');
+        const isSaldoInicial = tipo === 'saldo_inicial';
+        if (!tipo || !data || isNaN(valor) || (!isSaldoInicial && valor <= 0)) {
+            alert('Preencha os campos obrigatórios: Tipo, Data e Valor (deve ser maior que zero, exceto para Saldo Inicial).');
             return;
         }
 
