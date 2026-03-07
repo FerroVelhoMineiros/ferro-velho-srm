@@ -54,8 +54,14 @@ window.DashboardConciliacaoModule = {
             let saldoCC = 0;
             lancamentos.forEach(l => {
                 const v = Number(l.valor);
-                if (l.tipo === 'adiantamento') saldoCC += v;
-                else saldoCC -= v;
+                // Adiciona o que aumenta a dívida
+                if (l.tipo === 'adiantamento' || l.tipo === 'saldo_inicial') {
+                    saldoCC += v;
+                }
+                // Subtrai o que abate a dívida (ignorando conferencia)
+                else if (l.tipo !== 'conferencia') {
+                    saldoCC -= v;
+                }
             });
 
             // Buscar as datas unicas que existem no banco (fazemos uma requisição rápida para pegar todos os meses se for a primeira vez)
