@@ -195,11 +195,11 @@ window.ContaCorrenteModule = {
                         <div>
                             <label style="color:var(--text-secondary); font-size:0.85rem;">Tipo *</label>
                             <select id="cc-tipo" class="form-control" onchange="window.ContaCorrenteModule.onTipoChange(this.value)" style="width:100%; padding:8px; border-radius:4px; border:1px solid var(--border-color); background:rgba(0,0,0,0.2); color:white;">
-                                <option value="saldo_inicial">Saldo Inicial (Devedor/Credor)</option>
                                 <option value="adiantamento">Adiantamento Recebido (+)</option>
                                 <option value="complemento">Complemento / Ajuste (-)</option>
                                 <option value="abatimento_impureza">Abatimento Impureza (-)</option>
                                 <option value="abatimento_resultado">Abatimento Resultado (-)</option>
+                                <option value="saldo_inicial">Saldo Inicial (Devedor/Credor)</option>
                             </select>
                         </div>
 
