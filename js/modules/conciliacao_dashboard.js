@@ -169,7 +169,10 @@ window.DashboardConciliacaoModule = {
 
         notas.forEach(n => {
             const mesEmissao = n.data_emissao ? new Date(n.data_emissao).toISOString().substring(0, 7) : null;
-            const mesRecebimento = n.data_recebimento_gerdau ? new Date(n.data_recebimento_gerdau).toISOString().substring(0, 7) : null;
+            // Fallback: Se não tem data de recebimento (notas antigas), usa a data de emissão como base para não zerar o dashboard
+            const mesRecebimento = n.data_recebimento_gerdau
+                ? new Date(n.data_recebimento_gerdau).toISOString().substring(0, 7)
+                : mesEmissao;
 
             // --- 1. VOLUME ENVIADO (Baseado na Data de Emissão da Nota) ---
             if (!mesFiltro || mesEmissao === mesFiltro) {
