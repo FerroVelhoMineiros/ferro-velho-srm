@@ -24,6 +24,7 @@ const AppConciliacao = {
             notas_fiscais: window.NotasFiscaisModule,
             importacao: window.ImportacaoModule,
             conciliacao_notas: window.ConciliacaoNotasModule,
+            conta_corrente: window.ContaCorrenteModule,
             relatorios: { render: this.renderWIP }
         };
 

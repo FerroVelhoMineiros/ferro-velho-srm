@@ -567,5 +567,65 @@ module.exports = (pool) => {
         }
     });
 
+    // --- CONTA CORRENTE GERDAU ---
+
+    // Auto-cria a tabela se não existir
+    pool.query(`
+        CREATE TABLE IF NOT EXISTS conta_corrente_gerdau (
+            id SERIAL PRIMARY KEY,
+            data_lancamento DATE NOT NULL,
+            tipo VARCHAR(30) NOT NULL CHECK (tipo IN ('adiantamento', 'abatimento_nf', 'complemento')),
+            descricao TEXT,
+            numero_nota VARCHAR(50),
+            valor NUMERIC(15, 2) NOT NULL,
+            valor_gerdau NUMERIC(15, 2),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    `).catch(e => console.error('Erro criando tabela conta_corrente_gerdau:', e.message));
+
+    router.get('/conta-corrente', async (req, res) => {
+        try {
+            const result = await pool.query(
+                'SELECT * FROM conta_corrente_gerdau ORDER BY data_lancamento ASC, id ASC'
+            );
+            res.json(result.rows);
+        } catch (err) {
+            console.error(err);
+            res.status(500).json({ error: 'Erro ao buscar conta corrente' });
+        }
+    });
+
+    router.post('/conta-corrente', async (req, res) => {
+        const { tipo, data_lancamento, valor, descricao, numero_nota, valor_gerdau } = req.body;
+        if (!tipo || !data_lancamento || valor === undefined || isNaN(valor)) {
+            return res.status(400).json({ error: 'Campos obrigatórios: tipo, data_lancamento, valor' });
+        }
+        try {
+            const result = await pool.query(
+                `INSERT INTO conta_corrente_gerdau (tipo, data_lancamento, valor, descricao, numero_nota, valor_gerdau)
+                 VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+                [tipo, data_lancamento, valor, descricao || null, numero_nota || null, valor_gerdau || null]
+            );
+            res.status(201).json(result.rows[0]);
+        } catch (err) {
+            console.error(err);
+            res.status(500).json({ error: 'Erro ao salvar lançamento' });
+        }
+    });
+
+    router.delete('/conta-corrente/:id', async (req, res) => {
+        const { id } = req.params;
+        try {
+            const result = await pool.query(
+                'DELETE FROM conta_corrente_gerdau WHERE id = $1 RETURNING *', [id]
+            );
+            if (result.rows.length === 0) return res.status(404).json({ error: 'Lançamento não encontrado' });
+            res.json({ message: 'Lançamento excluído com sucesso' });
+        } catch (err) {
+            console.error(err);
+            res.status(500).json({ error: 'Erro ao excluir lançamento' });
+        }
+    });
+
     return router;
 };

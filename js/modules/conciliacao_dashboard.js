@@ -38,15 +38,25 @@ window.DashboardConciliacaoModule = {
             const url = mesFiltro ? `${baseUrl}/api/conciliacao/analise/notas?mes=${mesFiltro}` : `${baseUrl}/api/conciliacao/analise/notas`;
 
             // Promise.all para otimizar chamadas
-            const [resNotas, resAllConfig] = await Promise.all([
+            const [resNotas, resAllConfig, resCC] = await Promise.all([
                 fetch(url),
-                fetch(`${baseUrl}/api/conciliacao/configuracao`) // Sem mes= traz o mapa mes -> valor
+                fetch(`${baseUrl}/api/conciliacao/configuracao`), // Sem mes= traz o mapa mes -> valor
+                fetch(`${baseUrl}/api/conciliacao/conta-corrente`)
             ]);
 
             if (!resNotas.ok || !resAllConfig.ok) throw new Error('Falha na comunicação com o PostgreSQL');
 
             const notas = await resNotas.json();
             const configMap = await resAllConfig.json();
+            const lancamentos = resCC.ok ? await resCC.json() : [];
+
+            // Calcula saldo da conta corrente para o card do dashboard
+            let saldoCC = 0;
+            lancamentos.forEach(l => {
+                const v = Number(l.valor);
+                if (l.tipo === 'adiantamento') saldoCC += v;
+                else saldoCC -= v;
+            });
 
             // Buscar as datas unicas que existem no banco (fazemos uma requisição rápida para pegar todos os meses se for a primeira vez)
             if (mesFiltro === '') {
@@ -63,7 +73,7 @@ window.DashboardConciliacaoModule = {
                 return;
             }
 
-            this.buildDashboard(notas, configMap, mesFiltro);
+            this.buildDashboard(notas, configMap, mesFiltro, saldoCC);
 
             // Depois que o HTML for injetado, renderiza o ChartJS
             setTimeout(() => {
@@ -123,7 +133,7 @@ window.DashboardConciliacaoModule = {
         select.innerHTML = options;
     },
 
-    buildDashboard(notas, configMap, mesFiltro) {
+    buildDashboard(notas, configMap, mesFiltro, saldoCC = 0) {
         // --- CÁLCULOS DOS KPIS ---
         let totalEnviadoKg = 0;
         let totalRecebidoKg = 0;
@@ -269,6 +279,24 @@ window.DashboardConciliacaoModule = {
                         <button class="btn btn-sm" style="background: rgba(255,255,255,0.1); border: none; padding: 2px 8px; font-size: 0.75rem; color: #a855f7; cursor: pointer;" onclick="window.DashboardConciliacaoModule.changeImpurezaConfig(${precoMedioExibicao}, '${mesFiltro || 'GLOBAL'}')"><i class="fa-solid fa-pen"></i> Editar</button>
                     </div>
                 </div>
+
+                <!-- SALDO CONTA CORRENTE GERDAU -->
+                ${(() => {
+                const precoParaTon = (configMap[mesFiltro] || configMap['GLOBAL'] || 0.50);
+                const toneladasDevidas = precoParaTon > 0 ? saldoCC / (precoParaTon * 1000) : 0;
+                const saldoColor = saldoCC > 0 ? '#ef4444' : '#10b981';
+                const saldoIcon = saldoCC > 0 ? 'fa-triangle-exclamation' : 'fa-circle-check';
+                const fmtM = v => 'R$ ' + Math.abs(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                return `
+                <div class="metric-card" style="display: flex; flex-direction: column; align-items: stretch; gap: 0; background-color: var(--bg-card); padding: 1.5rem; border-radius: 12px; border: 1px solid ${saldoCC > 0 ? 'rgba(239,68,68,0.3)' : 'var(--border-color)'}; box-shadow: var(--shadow-sm); cursor:pointer;" onclick="AppConciliacao.navigate('conta_corrente')" title="Abrir Conta Corrente">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
+                        <h3 style="color: var(--text-secondary); font-size: 0.9rem; margin: 0; font-weight: 500;">Saldo Devedor Gerdau</h3>
+                        <div style="background: ${saldoCC > 0 ? 'rgba(239,68,68,0.1)' : 'rgba(16,185,129,0.1)'}; padding: 8px; border-radius: 8px; color: ${saldoColor};"><i class="fa-solid ${saldoIcon}"></i></div>
+                    </div>
+                    <div style="font-size: 2rem; font-weight: 700; color: ${saldoColor};">${fmtM(saldoCC)}</div>
+                    <div style="margin-top: 10px; font-size: 0.85rem; color: var(--text-secondary);">${saldoCC > 0 ? `≈ ${Math.abs(toneladasDevidas).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} t a enviar` : 'Saldo quitado ✅'} <i class="fa-solid fa-arrow-right" style="font-size:0.7rem; opacity:0.5;"></i></div>
+                </div>`;
+            })()}
 
             </div>
 
