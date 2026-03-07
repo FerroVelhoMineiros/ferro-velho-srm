@@ -165,12 +165,12 @@ window.DashboardConciliacaoModule = {
             valorGerdauTotalPago += valorGerPago;
 
             // === FÓRMULA DO RESULTADO DE CAIXA ===
-            // Resultado = Peso_Gerdau × Preço_Compra_Sucata_Mês − Valor_Pago_Gerdau
-            // (ICMS já está retido no valor pago — não multiplica)
+            // Resultado = Peso_Gerdau × Preço_Sucata_Mês × 1,12 (ICMS) − Valor_Pago_Gerdau
             if (n.status_conciliacao !== 'Pendente Gerdau' && n.status_conciliacao !== 'Falta no Sygecom') {
-                const valorEsperado = pesoRecebido * precoMes;
+                const icmsMult = n.status_conciliacao === 'Baixa Manual' ? 1 : 1.12;
+                const valorEsperado = pesoRecebido * precoMes * icmsMult;
                 const resultado = valorEsperado - valorGerPago;
-                valorTotalPrejuizoCaixa += resultado; // positivo = lucro, negativo = prejuízo
+                valorTotalPrejuizoCaixa += resultado;
             }
 
             // Contagem de alertas
