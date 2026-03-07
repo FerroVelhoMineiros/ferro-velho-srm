@@ -341,34 +341,54 @@ window.DashboardConciliacaoModule = {
                         <div style="background: ${saldoCC > 0 ? 'rgba(239,68,68,0.1)' : 'rgba(16,185,129,0.1)'}; padding: 8px; border-radius: 8px; color: ${saldoColor};"><i class="fa-solid ${saldoIcon}"></i></div>
                     </div>
                     <div style="font-size: 2rem; font-weight: 700; color: ${saldoColor};">${fmtM(saldoCC)}</div>
-                    <div style="margin-top: 10px; font-size: 0.85rem; color: var(--text-secondary);">${saldoCC > 0 ? `≈ ${Math.abs(toneladasDevidas).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} t a enviar` : 'Saldo quitado / Crédito ✅'} <i class="fa-solid fa-arrow-right" style="font-size:0.7rem; opacity:0.5;"></i></div>
+                    <div style="margin-top: 10px; font-size: 0.85rem; color: var(--text-secondary);">Dívida de Adiantamento Bruta <i class="fa-solid fa-arrow-right" style="font-size:0.7rem; opacity:0.5;"></i></div>
                 </div>`;
             })()}
 
+                <!-- NFS EM ABERTO (ENVIADAS / PENDENTE GERDAU) -->
+                <div class="metric-card" style="display: flex; flex-direction: column; align-items: stretch; gap: 0; background-color: var(--bg-card); padding: 1.5rem; border-radius: 12px; border: 1px solid var(--border-color); box-shadow: var(--shadow-sm);">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
+                        <h3 style="color: var(--text-secondary); font-size: 0.9rem; margin: 0; font-weight: 500;">NFs em Aberto (Trânsito)</h3>
+                        <div style="background: rgba(245, 158, 11, 0.1); padding: 8px; border-radius: 8px; color: #f59e0b;"><i class="fa-solid fa-clock-rotate-left"></i></div>
+                    </div>
+                    <div style="font-size: 2rem; font-weight: 700; color: #f59e0b;">${fmtMoney(valorNfsAberto)}</div>
+                    <div style="margin-top: 10px; font-size: 0.85rem; color: var(--text-secondary);">${alertasGerdauPendentes} notas enviadas p/ Gerdau</div>
+                </div>
+
                 <!-- SALDO EFETIVO GERAL (CONSOLIDADO) -->
                 ${(() => {
-                // Saldo Efetivo = Saldo_CC - Resultado_Gerdau - NFs_Aberto - Impurezas
-                // Tudo o que é crédito (para abater a dívida do adiantamento) entra subtraindo do Saldo CC (que é sua dívida bruta)
-                const saldoEfetivo = saldoCC - valorTotalPrejuizoCaixa - valorNfsAberto - totalImpurezaValor;
+                // Cálculo do pendente real (Total - O que já foi baixado na CC)
+                const pendenteResult = valorTotalPrejuizoCaixa - totalAbatidoResultado;
+                const pendenteImp = totalImpurezaValor - totalAbatidoImpurezas;
+
+                // Saldo Efetivo = O que eu devo (Saldo CC) - O que eu tenho a receber/acertar (Créditos Pendentes)
+                // Se Saldo CC é 10.000 (Dívida) e tenho 2.000 de Resultado a receber, meu saldo efetivo é 8.000 (Dívida real)
+                const saldoEfetivo = saldoCC - pendenteResult - valorNfsAberto - pendenteImp;
+
                 const efColor = saldoEfetivo > 0 ? '#ef4444' : '#10b981';
                 const efIcon = saldoEfetivo > 0 ? 'fa-building-columns' : 'fa-piggy-bank';
                 const fmtM = v => 'R$ ' + Math.abs(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
                 return `
                 <div class="metric-card" 
-                     style="display: flex; flex-direction: column; align-items: stretch; gap: 0; background-color: var(--bg-card); padding: 1.5rem; border-radius: 12px; border: 1px solid ${efColor}; border-width: 2px; box-shadow: var(--shadow-sm);"
+                     style="display: flex; flex-direction: column; align-items: stretch; gap: 0; background-color: var(--bg-card); padding: 1.5rem; border-radius: 12px; border: 1px solid ${efColor}; border-width: 2px; box-shadow: var(--shadow-md); position:relative; overflow:hidden;"
                      title="Cálculo do Saldo Efetivo:
-(+) Saldo CC: ${fmtM(saldoCC)}
-(-) Resultado (Diferença): ${fmtM(valorTotalPrejuizoCaixa)}
+(+) Saldo CC (Dívida Atual): ${fmtM(saldoCC)}
+(-) Resultado Pendente: ${fmtM(pendenteResult)}
 (-) NFs em Aberto (Est.): ${fmtM(valorNfsAberto)}
-(-) Impurezas: ${fmtM(totalImpurezaValor)}
+(-) Impurezas Pendentes: ${fmtM(pendenteImp)}
 ----------------------------
 (=) Saldo Efetivo: ${fmtM(saldoEfetivo)}">
+                    <div style="position:absolute; top:0; right:0; width:80px; height:80px; background: ${efColor}; opacity:0.05; border-radius:0 0 0 100%; pointer-events:none;"></div>
                     <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
                         <h3 style="color: var(--text-secondary); font-size: 0.9rem; margin: 0; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Saldo Efetivo Geral</h3>
-                        <div style="background: ${saldoEfetivo > 0 ? 'rgba(239,68,68,0.1)' : 'rgba(16,185,129,0.1)'}; padding: 8px; border-radius: 8px; color: ${efColor};"><i class="fa-solid ${efIcon}"></i></div>
+                        <div style="background: ${saldoEfetivo > 0 ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 129, 129, 0.1)'}; padding: 8px; border-radius: 8px; color: ${efColor};"><i class="fa-solid ${efIcon}"></i></div>
                     </div>
-                    <div style="font-size: 2.2rem; font-weight: 800; color: ${efColor};">${fmtM(saldoEfetivo)}</div>
-                    <div style="margin-top: 10px; font-size: 0.85rem; color: var(--text-secondary); font-style: italic;">${saldoEfetivo > 0 ? 'Débito Efetivo' : 'Crédito Efetivo Livre'}</div>
+                    <div style="font-size: 2.2rem; font-weight: 800; color: ${efColor};">${fmtM(saldoEfetivo)} ${saldoEfetivo < 0 ? '<span style="font-size:1rem; vertical-align:middle; opacity:0.8;">(CRÉDITO)</span>' : ''}</div>
+                    <div style="margin-top: 10px; font-size: 0.85rem; color: var(--text-secondary); font-style: italic; display:flex; justify-content:space-between; align-items:center;">
+                         <span>${saldoEfetivo > 0 ? '⚠️ O que você ainda deve (Dívida Real)' : '✅ Você está com saldo positivo livre'}</span>
+                         <span style="font-weight:600; font-style:normal;">${saldoEfetivo > 0 ? `≈ ${Math.abs(saldoEfetivo / ((configMap[mesFiltro] || configMap['GLOBAL'] || 0.50) * 1000)).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} t` : ''}</span>
+                    </div>
                 </div>`;
             })()}
 

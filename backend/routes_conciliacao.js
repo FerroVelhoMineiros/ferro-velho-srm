@@ -133,13 +133,29 @@ module.exports = (pool) => {
                     const valor_total = parseFloat(getCol(['Valor Gerdau', 'Valor Liquido', 'valor_total'])) || 0;
                     const valor_por_kg = peso_recebido > 0 ? (valor_total / peso_recebido) : 0;
 
-                    let dataMigoRaw = getCol(['MIGO', 'Data', 'Data de lançamento', 'Data de Lançamento', 'Data Migo', 'data_recebimento']);
+                    let dataMigoRaw = getCol(['MIGO', 'Data', 'Data de lançamento', 'Data de Lançamento', 'Data pagamento', 'Data Pagamento', 'Data Migo', 'data_recebimento']);
                     let data_recebimento = null;
                     if (typeof dataMigoRaw === 'number') {
                         // Converte data serial do Excel (ex: 45321)
                         data_recebimento = new Date(Math.round((dataMigoRaw - 25569) * 86400 * 1000));
                     } else if (dataMigoRaw) {
-                        data_recebimento = new Date(dataMigoRaw);
+                        const dataStr = String(dataMigoRaw);
+                        if (dataStr.includes('/') || dataStr.includes('-')) {
+                            const sep = dataStr.includes('/') ? '/' : '-';
+                            const partes = dataStr.split(sep);
+                            if (partes.length === 3) {
+                                // Assume DD/MM/YYYY ou YYYY/MM/DD
+                                if (partes[0].length === 4) { // YYYY/MM/DD
+                                    data_recebimento = new Date(`${partes[0]}-${partes[1]}-${partes[2]}T12:00:00Z`);
+                                } else { // DD/MM/YYYY
+                                    data_recebimento = new Date(`${partes[2]}-${partes[1]}-${partes[0]}T12:00:00Z`);
+                                }
+                            } else {
+                                data_recebimento = new Date(dataMigoRaw);
+                            }
+                        } else {
+                            data_recebimento = new Date(dataMigoRaw);
+                        }
                     }
 
                     // Previne quebra de chave estrangeira se o usuário importar GERDAU antes de importar o SYGECOM base
