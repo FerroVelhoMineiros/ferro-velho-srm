@@ -141,13 +141,14 @@ window.DashboardConciliacaoModule = {
         const globalPriceFallback = configMap['GLOBAL'] || 0.50;
 
         notas.forEach(n => {
-            totalEnviadoKg += Number(n.peso_enviado || 0);
+            const pesoEnviado = Number(n.peso_enviado || 0);
+            totalEnviadoKg += pesoEnviado;
             totalRecebidoKg += Number(n.peso_recebido || 0);
 
             const impKg = Number(n.impurezas || 0);
             totalImpurezaKg += impKg;
 
-            // Busca preço do mês específico da nota
+            // Busca preço de compra da sucata do mês específico da nota
             let precoMes = globalPriceFallback;
             if (n.data_emissao) {
                 const mesNota = new Date(n.data_emissao).toISOString().substring(0, 7);
@@ -155,41 +156,49 @@ window.DashboardConciliacaoModule = {
                     precoMes = configMap[mesNota];
                 }
             }
+
+            // Valor das impurezas descontadas (para o card de controle de impurezas)
             totalImpurezaValor += (impKg * precoMes);
 
-            // Lógica do Faturamento com Impostos (Simulação de 12% de ICMS em cima do NFe bruto, exceto nas pagas integrais com imposto já embutido)
-            const valorSygBruto = Number(n.valor_sygecom_sem_imposto) || 0;
-            const valorSygImposto = n.status_conciliacao === 'Baixa Manual' ? valorSygBruto : (valorSygBruto + (valorSygBruto * 0.12));
             const valorGerPago = Number(n.valor_gerdau_com_imposto) || 0;
-
-            valorSygecomTotalComImposto += valorSygImposto;
             valorGerdauTotalPago += valorGerPago;
 
+            // === NOVA FÓRMULA DO RESULTADO DE CAIXA ===
+            // Resultado = Peso_Sygecom × Preço_Compra_Sucata_Mês × (1 + ICMS 12%) − Valor_Pago_Gerdau
+            // (apenas para notas que não estão pendentes)
+            if (n.status_conciliacao !== 'Pendente Gerdau' && n.status_conciliacao !== 'Falta no Sygecom') {
+                // Baixa Manual: não tem ICMS simulado (a Gerdau pagou integral)
+                const icmsMult = n.status_conciliacao === 'Baixa Manual' ? 1 : 1.12;
+                const valorEsperado = pesoEnviado * precoMes * icmsMult;
+                const resultado = valorEsperado - valorGerPago;
+                valorTotalPrejuizoCaixa += resultado; // positivo = lucro, negativo = prejuízo
+            }
+
+            // Contagem de alertas
             if (n.status_conciliacao === 'Divergência') {
                 alertasDivergencia++;
-                // Calcula a perda
                 const desc = Number(n.diferenca_peso || 0);
-                if (desc > 0) {
-                    totalPerdaKg += desc;
-                }
+                if (desc > 0) totalPerdaKg += desc;
             } else if (n.status_conciliacao === 'Pendente Gerdau') {
                 alertasGerdauPendentes++;
             }
 
-            // Soma o prejuizo real
-            if (n.status_conciliacao !== 'Pendente Gerdau' && n.status_conciliacao !== 'Falta no Sygecom') {
-                const diffCaixa = valorSygImposto - valorGerPago;
-                if (diffCaixa > 10) { // Tolerância de $10
-                    valorTotalPrejuizoCaixa += diffCaixa;
-                }
-            }
+            // Acumula valor Sygecom apenas para referência
+            const valorSygBruto = Number(n.valor_sygecom_sem_imposto) || 0;
+            const icmsMult = n.status_conciliacao === 'Baixa Manual' ? 1 : 1.12;
+            valorSygecomTotalComImposto += valorSygBruto * icmsMult;
         });
 
         // Proteção contra divisão por zero
         const percentualPerdaVisaoGeral = totalEnviadoKg > 0 ? ((totalPerdaKg / totalEnviadoKg) * 100).toFixed(2) : 0;
 
-        // Média Aritmética / Ponderada Global
-        const precoMedioExibicao = totalImpurezaKg > 0 ? (totalImpurezaValor / totalImpurezaKg) : globalPriceFallback;
+        // Preço médio ponderado exibído no card de sucata
+        const precoMedioExibicao = totalEnviadoKg > 0
+            ? (valorSygecomTotalComImposto / totalEnviadoKg)
+            : globalPriceFallback;
+
+        // Resultado: positivo = lucro (Gerdau deve devolver), negativo = prejuízo
+        const isLucro = valorTotalPrejuizoCaixa >= 0;
 
         // Helpers de Formatação
         const fmtKg = (val) => val.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + ' kg';
@@ -229,17 +238,17 @@ window.DashboardConciliacaoModule = {
                     <div style="margin-top: 10px; font-size: 0.85rem; color: #ef4444;">${percentualPerdaVisaoGeral}% do material enviado</div>
                 </div>
 
-                <!-- PREJUIZO CAIXA (SOMA NF COM IMPOSTO VS GERDAU PAGOU) -->
+                <!-- RESULTADO CAIXA (Lucro/Prejuízo Real vs Gerdau) -->
                 <div class="metric-card" style="display: flex; flex-direction: column; align-items: stretch; gap: 0; background-color: var(--bg-card); padding: 1.5rem; border-radius: 12px; border: 1px solid var(--border-color); box-shadow: var(--shadow-sm);">
                     <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
-                        <h3 style="color: var(--text-secondary); font-size: 0.9rem; margin: 0; font-weight: 500;">Prejuízo R$ (Caixa Real)</h3>
-                        <div style="background: rgba(245, 158, 11, 0.1); padding: 8px; border-radius: 8px; color: #f59e0b;"><i class="fa-solid fa-hand-holding-dollar"></i></div>
+                        <h3 style="color: var(--text-secondary); font-size: 0.9rem; margin: 0; font-weight: 500;">Resultado vs Gerdau</h3>
+                        <div style="background: ${isLucro ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)'}; padding: 8px; border-radius: 8px; color: ${isLucro ? '#10b981' : '#ef4444'};"><i class="fa-solid ${isLucro ? 'fa-circle-check' : 'fa-hand-holding-dollar'}"></i></div>
                     </div>
-                    <div style="font-size: 2rem; font-weight: 700; color: #ef4444;">${fmtMoney(valorTotalPrejuizoCaixa)}</div>
-                    <div style="margin-top: 10px; font-size: 0.85rem; color: var(--text-secondary);">Syg(+Imp) - Gerdau</div>
+                    <div style="font-size: 2rem; font-weight: 700; color: ${isLucro ? '#10b981' : '#ef4444'};">${fmtMoney(Math.abs(valorTotalPrejuizoCaixa))}</div>
+                    <div style="margin-top: 10px; font-size: 0.85rem; color: var(--text-secondary);">${isLucro ? '✔️ Crédito a receber da Gerdau' : '⚠️ Prejuízo — Gerdau deve devolver'}</div>
                 </div>
                 
-                <!-- VOLUME IMPUREZAS GERAIS -->
+                <!-- CONTROLE DE SUCATA / PREÇO DE COMPRA -->
                 <div class="metric-card" style="display: flex; flex-direction: column; align-items: stretch; gap: 0; background-color: var(--bg-card); padding: 1.5rem; border-radius: 12px; border: 1px solid var(--border-color); box-shadow: var(--shadow-sm);">
                     <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
                         <h3 style="color: var(--text-secondary); font-size: 0.9rem; margin: 0; font-weight: 500;">Controle de Impurezas</h3>
@@ -247,7 +256,7 @@ window.DashboardConciliacaoModule = {
                     </div>
                     <div style="font-size: 2rem; font-weight: 700; color: #a855f7;">${fmtKg(totalImpurezaKg)}</div>
                     <div style="margin-top: 10px; font-size: 0.85rem; color: var(--text-secondary); display: flex; justify-content: space-between; align-items: center;">
-                        <span>${fmtMoney(totalImpurezaValor)} <span style="font-size: 0.75rem; opacity: 0.7;">(R$ ${precoMedioExibicao.toFixed(2)}/kg ${mesFiltro ? '' : 'médio'})</span></span>
+                        <span>${fmtMoney(totalImpurezaValor)} <span style="font-size: 0.75rem; opacity: 0.7;">(R$ ${precoMedioExibicao.toFixed(2)}/kg ${mesFiltro ? '' : 'compra méd.'})</span></span>
                         <button class="btn btn-sm" style="background: rgba(255,255,255,0.1); border: none; padding: 2px 8px; font-size: 0.75rem; color: #a855f7; cursor: pointer;" onclick="window.DashboardConciliacaoModule.changeImpurezaConfig(${precoMedioExibicao}, '${mesFiltro || 'GLOBAL'}')"><i class="fa-solid fa-pen"></i> Editar</button>
                     </div>
                 </div>
@@ -383,7 +392,7 @@ window.DashboardConciliacaoModule = {
         const newValueFormatado = currentValue ? currentValue.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0,00';
         const labelMes = mesContexto === 'GLOBAL' ? 'PREÇO PADRÃO (Global)' : `MÊS: ${mesContexto}`;
 
-        const result = prompt(`Definir preço pago por KG de impureza\n${labelMes}\n\nValor Atual: R$ ${newValueFormatado}\nUse ponto para centavos. Ex: 0.50`, currentValue.toFixed(2));
+        const result = prompt(`Preço de Compra da Sucata do Mês\n${labelMes}\n\nValor Atual: R$ ${newValueFormatado}/kg\nDigite o novo valor (use ponto para centavos. Ex: 0.50)`, currentValue.toFixed(2));
 
         if (result === null) return; // Cancelou
 
