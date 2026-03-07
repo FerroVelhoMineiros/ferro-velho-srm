@@ -112,7 +112,7 @@ window.ContaCorrenteModule = {
                         <td style="padding: 12px 16px; font-weight: 700; color: ${saldoColor};">${fmtMoney(saldoAcum)}</td>
                         <td style="padding: 12px 16px; text-align: center;">
                             ${divergencia}
-                            <button onclick="window.ContaCorrenteModule.excluir(${l.id})" style="background:none; border:none; color:#ef4444; cursor:pointer; margin-left:8px;" title="Excluir"><i class="fa-solid fa-trash"></i></button>
+                            ${l.manual ? `<button onclick="window.ContaCorrenteModule.excluir(${l.id})" style="background:none; border:none; color:#ef4444; cursor:pointer; margin-left:8px;" title="Excluir"><i class="fa-solid fa-trash"></i></button>` : `<span style="color:var(--text-secondary); font-size:0.7rem; margin-left:8px;" title="Automático via Importação"><i class="fa-solid fa-lock"></i></span>`}
                         </td>
                     </tr>`;
             }).join('');

@@ -585,9 +585,52 @@ module.exports = (pool) => {
 
     router.get('/conta-corrente', async (req, res) => {
         try {
-            const result = await pool.query(
-                'SELECT * FROM conta_corrente_gerdau ORDER BY data_lancamento ASC, id ASC'
-            );
+            // UNION entre lançamentos manuais e abatimentos automáticos vindo das NFs pagas pela Gerdau
+            const query = `
+                SELECT * FROM (
+                    -- Lançamentos Manuais
+                    SELECT 
+                        id, 
+                        data_lancamento, 
+                        tipo, 
+                        descricao, 
+                        numero_nota, 
+                        valor, 
+                        valor_gerdau, 
+                        true as manual
+                    FROM conta_corrente_gerdau
+
+                    UNION ALL
+
+                    -- Abatimentos Automáticos (NFs que constam no sistema Gerdau ou Baixa Manual)
+                    SELECT 
+                        0 as id,
+                        nf.data_emissao as data_lancamento,
+                        'abatimento_nf' as tipo,
+                        'Abatimento Automático (NF Gerdau)' as descricao,
+                        nf.numero_nota,
+                        CASE 
+                            WHEN nf.baixa_manual THEN COALESCE(s.valor_esperado, 0)
+                            ELSE COALESCE(g.valor_total, 0)
+                        END as valor,
+                        COALESCE(g.valor_total, 0) as valor_gerdau,
+                        false as manual
+                    FROM notas_fiscais nf
+                    LEFT JOIN (
+                        SELECT numero_nota, SUM(valor_total) as valor_esperado 
+                        FROM itens_nota_sygecom GROUP BY numero_nota
+                    ) s ON nf.numero_nota = s.numero_nota
+                    LEFT JOIN (
+                        SELECT numero_nota, SUM(valor_total) as valor_total 
+                        FROM itens_recebidos_gerdau GROUP BY numero_nota
+                    ) g ON nf.numero_nota = g.numero_nota
+                    WHERE 
+                        g.valor_total IS NOT NULL -- Se tem valor na Gerdau, abate automático
+                        OR nf.baixa_manual = true  -- Se foi baixada manual, abate o valor esperado
+                ) combined
+                ORDER BY data_lancamento ASC, id ASC
+            `;
+            const result = await pool.query(query);
             res.json(result.rows);
         } catch (err) {
             console.error(err);
