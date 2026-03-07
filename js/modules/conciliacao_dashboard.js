@@ -151,13 +151,15 @@ window.DashboardConciliacaoModule = {
 
         const globalPriceFallback = configMap['GLOBAL'] || 0.50;
 
-        // Notas que já foram compensadas (abatimentos manuais ou automáticos)
-        const nfsCompensadas = new Set(
-            lancamentosCC
-                .filter(l => l.tipo === 'abatimento_nf' || l.tipo === 'abatimento')
-                .map(l => l.numero_nota)
-                .filter(Boolean)
-        );
+        // Soma os abatimentos já registrados na Conta Corrente
+        let totalAbatidoImpurezas = 0;
+        let totalAbatidoResultado = 0;
+
+        lancamentosCC.forEach(l => {
+            const v = Number(l.valor);
+            if (l.tipo === 'abatimento_impureza') totalAbatidoImpurezas += v;
+            if (l.tipo === 'abatimento_resultado') totalAbatidoResultado += v;
+        });
 
         notas.forEach(n => {
             const pesoEnviado = Number(n.peso_enviado || 0);
@@ -177,10 +179,8 @@ window.DashboardConciliacaoModule = {
                 }
             }
 
-            // Valor das impurezas descontadas (SÓ CONTA SE AINDA NÃO FOI COMPENSADA NA CONTA CORRENTE)
-            if (!nfsCompensadas.has(n.numero_nota)) {
-                totalImpurezaValor += (impKg * precoMes);
-            }
+            // Valor das impurezas descontadas (Soma bruta)
+            totalImpurezaValor += (impKg * precoMes);
 
             const valorGerPago = Number(n.valor_gerdau_com_imposto) || 0;
             valorGerdauTotalPago += valorGerPago;
@@ -190,10 +190,7 @@ window.DashboardConciliacaoModule = {
                 const icmsMult = n.status_conciliacao === 'Baixa Manual' ? 1 : 1.12;
                 const valorEsperado = pesoRecebido * precoMes * icmsMult;
                 const resultado = valorEsperado - valorGerPago;
-
-                if (!nfsCompensadas.has(n.numero_nota)) {
-                    valorTotalPrejuizoCaixa += resultado;
-                }
+                valorTotalPrejuizoCaixa += resultado;
             }
 
             // Contagem de alertas
@@ -278,8 +275,11 @@ window.DashboardConciliacaoModule = {
                         <h3 style="color: var(--text-secondary); font-size: 0.9rem; margin: 0; font-weight: 500;">Resultado vs Gerdau</h3>
                         <div style="background: ${isLucro ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)'}; padding: 8px; border-radius: 8px; color: ${isLucro ? '#10b981' : '#ef4444'};"><i class="fa-solid ${isLucro ? 'fa-circle-check' : 'fa-hand-holding-dollar'}"></i></div>
                     </div>
-                    <div style="font-size: 2rem; font-weight: 700; color: ${isLucro ? '#10b981' : '#ef4444'};">${fmtMoney(Math.abs(valorTotalPrejuizoCaixa))}</div>
-                    <div style="margin-top: 10px; font-size: 0.85rem; color: var(--text-secondary);">${isLucro ? '✔️ Crédito a receber da Gerdau' : '⚠️ Prejuízo — Gerdau deve devolver'}</div>
+                    <div style="font-size: 2rem; font-weight: 700; color: ${isLucro ? '#10b981' : '#ef4444'};">${fmtMoney(Math.abs(valorTotalPrejuizoCaixa - totalAbatidoResultado))}</div>
+                    <div style="margin-top: 10px; font-size: 0.85rem; color: var(--text-secondary); display:flex; justify-content:space-between; align-items:center;">
+                        <span>${isLucro ? '✔️ Pendente a receber' : '⚠️ Pendente — Devolver'}</span>
+                        ${(Math.abs(valorTotalPrejuizoCaixa - totalAbatidoResultado) > 0.01) ? `<button class="btn btn-sm" style="background:#10b981; border:none; color:white; padding:2px 8px; border-radius:4px; cursor:pointer;" onclick="window.DashboardConciliacaoModule.abrirModalBaixa('resultado', ${valorTotalPrejuizoCaixa - totalAbatidoResultado})"><i class="fa-solid fa-check"></i> Baixar</button>` : ''}
+                    </div>
                 </div>
                 
                 <!-- CONTROLE DE SUCATA / PREÇO DE COMPRA -->
@@ -289,9 +289,15 @@ window.DashboardConciliacaoModule = {
                         <div style="background: rgba(168, 85, 247, 0.1); padding: 8px; border-radius: 8px; color: #a855f7;"><i class="fa-solid fa-filter"></i></div>
                     </div>
                     <div style="font-size: 2rem; font-weight: 700; color: #a855f7;">${fmtKg(totalImpurezaKg)}</div>
-                    <div style="margin-top: 10px; font-size: 0.85rem; color: var(--text-secondary); display: flex; justify-content: space-between; align-items: center;">
-                        <span>${fmtMoney(totalImpurezaValor)} <span style="font-size: 0.75rem; opacity: 0.7;">(R$ ${precoMedioExibicao.toFixed(2)}/kg ${mesFiltro ? '' : 'compra méd.'})</span></span>
-                        <button class="btn btn-sm" style="background: rgba(255,255,255,0.1); border: none; padding: 2px 8px; font-size: 0.75rem; color: #a855f7; cursor: pointer;" onclick="window.DashboardConciliacaoModule.changeImpurezaConfig(${precoMedioExibicao}, '${mesFiltro || 'GLOBAL'}')"><i class="fa-solid fa-pen"></i> Editar</button>
+                    <div style="margin-top: 10px; font-size: 0.85rem; color: var(--text-secondary); display: flex; flex-direction:column; gap:8px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <span>${fmtMoney(totalImpurezaValor - totalAbatidoImpurezas)} <span style="font-size: 0.75rem; opacity: 0.7;">pendente</span></span>
+                            ${(totalImpurezaValor - totalAbatidoImpurezas > 0.01) ? `<button class="btn btn-sm" style="background:#a855f7; border:none; color:white; padding:2px 8px; border-radius:4px; cursor:pointer;" onclick="window.DashboardConciliacaoModule.abrirModalBaixa('impureza', ${totalImpurezaValor - totalAbatidoImpurezas})"><i class="fa-solid fa-check"></i> Baixar</button>` : '<span style="color:#10b981; font-weight:600;">Baixado!</span>'}
+                        </div>
+                        <div style="display:flex; justify-content:space-between; align-items:center; opacity:0.6; font-size:0.75rem;">
+                             <span>Ref: R$ ${precoMedioExibicao.toFixed(2)}/kg</span>
+                             <button style="background:none; border:none; color:inherit; cursor:pointer; padding:0;" onclick="window.DashboardConciliacaoModule.changeImpurezaConfig(${precoMedioExibicao}, '${mesFiltro || 'GLOBAL'}')"><i class="fa-solid fa-pen"></i></button>
+                        </div>
                     </div>
                 </div>
 
@@ -382,6 +388,35 @@ window.DashboardConciliacaoModule = {
                 </div>
 
             </div>
+
+            <!-- Modal para Baixa Manual de Créditos -->
+            <div id="modal-baixa-credito" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:2000; align-items:center; justify-content:center;">
+                <div style="background:var(--bg-card); border-radius:16px; padding:2rem; width:400px; max-width:95vw; border:1px solid var(--border-color); box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+                    <h3 id="baixa-titulo" style="margin:0 0 1rem 0; color:var(--text-primary);">Baixar Crédito</h3>
+                    <p style="color:var(--text-secondary); font-size:0.85rem; margin-bottom:1.5rem;">Confirme o valor do acerto informado pela Gerdau para baixar deste saldo pendente.</p>
+                    
+                    <div style="display:flex; flex-direction:column; gap:1.2rem;">
+                        <div>
+                            <label style="color:var(--text-secondary); font-size:0.85rem;">Data da Baixa *</label>
+                            <input type="date" id="baixa-data" class="form-control" style="margin-top:4px; width:100%; background:rgba(15,23,42,0.8); color:white; border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:8px 12px;" value="${new Date().toISOString().split('T')[0]}">
+                        </div>
+                        <div>
+                            <label style="color:var(--text-secondary); font-size:0.85rem;">Valor a Liquidar (R$) *</label>
+                            <input type="number" id="baixa-valor" step="0.01" class="form-control" style="margin-top:4px; width:100%; background:rgba(15,23,42,0.8); color:white; border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:8px 12px;">
+                        </div>
+                        <div>
+                            <label style="color:var(--text-secondary); font-size:0.85rem;">Descrição</label>
+                            <input type="text" id="baixa-desc" class="form-control" style="margin-top:4px; width:100%; background:rgba(15,23,42,0.8); color:white; border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:8px 12px;">
+                        </div>
+                        <input type="hidden" id="baixa-tipo-alvo">
+                    </div>
+                    
+                    <div style="display:flex; gap:1rem; margin-top:2rem; justify-content:flex-end;">
+                        <button class="btn btn-secondary" onclick="window.DashboardConciliacaoModule.fecharModalBaixa()">Cancelar</button>
+                        <button class="btn btn-primary" id="btn-confirmar-baixa" onclick="window.DashboardConciliacaoModule.confirmarBaixa()">Confirmar Baixa</button>
+                    </div>
+                </div>
+            </div>
         `;
 
         this.container.querySelector('.page-content').innerHTML = dashboardHtml;
@@ -465,6 +500,68 @@ window.DashboardConciliacaoModule = {
                 }
             }
         });
+    },
+
+    // --- Métodos de Baixa de Crédito para Conta Corrente ---
+
+    abrirModalBaixa(tipo, valorSugerido) {
+        const modal = document.getElementById('modal-baixa-credito');
+        const titulo = document.getElementById('baixa-titulo');
+        const inputVal = document.getElementById('baixa-valor');
+        const inputDesc = document.getElementById('baixa-desc');
+        const inputTipo = document.getElementById('baixa-tipo-alvo');
+
+        if (!modal) return;
+
+        titulo.innerText = tipo === 'impureza' ? 'Baixar Crédito de Impurezas' : 'Baixar Crédito de Resultado';
+        inputVal.value = Math.abs(valorSugerido).toFixed(2);
+        inputTipo.value = tipo === 'impureza' ? 'abatimento_impureza' : 'abatimento_resultado';
+        inputDesc.value = tipo === 'impureza' ? 'Baixa de impurezas acumuladas' : 'Baixa de acerto de diferença de preço';
+
+        modal.style.display = 'flex';
+    },
+
+    fecharModalBaixa() {
+        const modal = document.getElementById('modal-baixa-credito');
+        if (modal) modal.style.display = 'none';
+    },
+
+    async confirmarBaixa() {
+        const tipo = document.getElementById('baixa-tipo-alvo')?.value;
+        const data = document.getElementById('baixa-data')?.value;
+        const valor = parseFloat(document.getElementById('baixa-valor')?.value);
+        const descricao = document.getElementById('baixa-desc')?.value;
+
+        if (!data || isNaN(valor) || valor <= 0) {
+            alert('Informe uma data e um valor válido.');
+            return;
+        }
+
+        try {
+            const baseUrl = window.location.origin.includes('localhost') ? 'http://localhost:3000' : '';
+            const res = await fetch(`${baseUrl}/api/conciliacao/conta-corrente`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    tipo,
+                    data_lancamento: data,
+                    valor,
+                    descricao,
+                    valor_gerdau: null
+                })
+            });
+
+            if (!res.ok) throw new Error('Falha ao registrar baixa na Conta Corrente');
+
+            this.fecharModalBaixa();
+            // Assuming `this.container` is available or passed correctly to loadAndRenderDashboard
+            // If `this.container` is not the correct argument, it should be adjusted based on actual usage.
+            // For now, assuming it's meant to trigger a full dashboard reload.
+            await this.loadAndRenderDashboard(document.getElementById('mes-filtro')?.value || ''); // Recarrega o dashboard
+            alert('Baixa realizada com sucesso! O valor foi lançado em sua Conta Corrente.');
+        } catch (e) {
+            alert('Erro: ' + e.message);
+        }
     },
 
     async changeImpurezaConfig(currentValue, mesContexto) {

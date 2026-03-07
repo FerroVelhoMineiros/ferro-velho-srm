@@ -64,7 +64,7 @@ window.ContaCorrenteModule = {
             const v = Number(l.valor);
             if (l.tipo === 'adiantamento') totalAdiantado += v;
             else if (l.tipo === 'abatimento_nf') totalAbatido += v;
-            else if (l.tipo === 'complemento') totalComplementos += v;
+            else if (l.tipo === 'complemento' || l.tipo === 'abatimento_impureza' || l.tipo === 'abatimento_resultado') totalComplementos += v;
             else if (l.tipo === 'saldo_inicial') saldoInicial += v;
         });
 
@@ -92,11 +92,14 @@ window.ContaCorrenteModule = {
                 const dataFmt = l.data_lancamento ? new Date(l.data_lancamento).toLocaleDateString('pt-BR') : '-';
                 const tipoLabel = l.tipo === 'adiantamento' ? 'Adiantamento'
                     : l.tipo === 'abatimento_nf' ? 'Abatimento NF'
-                        : l.tipo === 'complemento' ? 'Complemento'
-                            : 'Saldo Inicial';
+                        : l.tipo === 'abatimento_impureza' ? 'Abat. Impureza'
+                            : l.tipo === 'abatimento_resultado' ? 'Abat. Resultado'
+                                : l.tipo === 'complemento' ? 'Complemento / Ajuste'
+                                    : l.tipo === 'saldo_inicial' ? 'Saldo Inicial'
+                                        : 'Conferência';
                 const tipoColor = l.tipo === 'adiantamento' ? '#10b981'
                     : l.tipo === 'saldo_inicial' ? '#3b82f6'
-                        : l.tipo === 'complemento' ? '#f59e0b'
+                        : (l.tipo === 'abatimento_impureza' || l.tipo === 'abatimento_resultado' || l.tipo === 'complemento') ? '#f59e0b'
                             : '#6b7280';
 
                 const divergencia = l.tipo === 'conferencia'
@@ -191,29 +194,28 @@ window.ContaCorrenteModule = {
                     <div style="display:flex; flex-direction:column; gap:1rem;">
                         <div>
                             <label style="color:var(--text-secondary); font-size:0.85rem;">Tipo *</label>
-                            <select id="cc-tipo" class="form-control" onchange="window.ContaCorrenteModule.onTipoChange(this.value)" style="margin-top:4px; width:100%; background:rgba(15,23,42,0.8); color:white; border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:8px 12px;">
+                            <select id="cc-tipo" class="form-control" onchange="window.ContaCorrenteModule.onTipoChange(this.value)" style="width:100%; padding:8px; border-radius:4px; border:1px solid var(--border-color); background:rgba(0,0,0,0.2); color:white;">
                                 <option value="saldo_inicial">Saldo Inicial (Devedor/Credor)</option>
-                                <option value="adiantamento">Adiantamento Recebido</option>
-                                <option value="complemento">Complemento / Ajuste</option>
+                                <option value="adiantamento">Adiantamento Recebido (+)</option>
+                                <option value="complemento">Complemento / Ajuste (-)</option>
+                                <option value="abatimento_impureza">Abatimento Impureza (-)</option>
+                                <option value="abatimento_resultado">Abatimento Resultado (-)</option>
                             </select>
                         </div>
 
-                        <div style="display:grid; grid-template-columns:1fr 1.5fr; gap:1rem;">
-                            <div>
-                                <label style="color:var(--text-secondary); font-size:0.85rem;">Data *</label>
-                                <input type="date" id="cc-data" class="form-control" style="margin-top:4px; width:100%; background:rgba(15,23,42,0.8); color:white; border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:8px 12px;" value="${new Date().toISOString().split('T')[0]}">
-                            </div>
-                            <div>
-                                <label style="color:var(--text-secondary); font-size:0.85rem;">Descrição</label>
-                                <input type="text" id="cc-descricao" class="form-control" placeholder="Ex.: Adiantamento março, Complemento..." style="margin-top:4px; width:100%; background:rgba(15,23,42,0.8); color:white; border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:8px 12px;">
-                            </div>
+                        <div>
+                            <label style="color:var(--text-secondary); font-size:0.85rem;">Data *</label>
+                            <input type="date" id="cc-data" class="form-control" style="margin-top:4px; width:100%; background:rgba(15,23,42,0.8); color:white; border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:8px 12px;" value="${new Date().toISOString().split('T')[0]}">
                         </div>
 
-                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
-                            <div>
-                                <label style="color:var(--text-secondary); font-size:0.85rem;">Valor (R$) *</label>
-                                <input type="number" id="cc-valor" step="0.01" min="0" class="form-control" placeholder="0.00" style="margin-top:4px; width:100%; background:rgba(15,23,42,0.8); color:white; border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:8px 12px;">
-                            </div>
+                        <div>
+                            <label style="color:var(--text-secondary); font-size:0.85rem;">Valor (R$) *</label>
+                            <input type="number" id="cc-valor" step="0.01" class="form-control" placeholder="0.00" style="margin-top:4px; width:100%; background:rgba(15,23,42,0.8); color:white; border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:8px 12px;">
+                        </div>
+
+                        <div>
+                            <label style="color:var(--text-secondary); font-size:0.85rem;">Descrição opcional</label>
+                            <input type="text" id="cc-descricao" class="form-control" placeholder="Ex.: Complemento de preço ref NF 123" style="margin-top:4px; width:100%; background:rgba(15,23,42,0.8); color:white; border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:8px 12px;">
                         </div>
                     </div>
                     <div style="display:flex; gap:1rem; margin-top:1.5rem; justify-content:flex-end;">
