@@ -73,7 +73,7 @@ window.DashboardConciliacaoModule = {
                 return;
             }
 
-            this.buildDashboard(notas, configMap, mesFiltro, saldoCC);
+            this.buildDashboard(notas, configMap, mesFiltro, saldoCC, lancamentos);
 
             // Depois que o HTML for injetado, renderiza o ChartJS
             setTimeout(() => {
@@ -133,7 +133,7 @@ window.DashboardConciliacaoModule = {
         select.innerHTML = options;
     },
 
-    buildDashboard(notas, configMap, mesFiltro, saldoCC = 0) {
+    buildDashboard(notas, configMap, mesFiltro, saldoCC = 0, lancamentosCC = []) {
         // --- CÁLCULOS DOS KPIS ---
         let totalEnviadoKg = 0;
         let totalRecebidoKg = 0;
@@ -150,6 +150,14 @@ window.DashboardConciliacaoModule = {
         let alertasDivergencia = 0;
 
         const globalPriceFallback = configMap['GLOBAL'] || 0.50;
+
+        // Notas que já foram compensadas (abatimentos manuais ou automáticos)
+        const nfsCompensadas = new Set(
+            lancamentosCC
+                .filter(l => l.tipo === 'abatimento_nf' || l.tipo === 'abatimento')
+                .map(l => l.numero_nota)
+                .filter(Boolean)
+        );
 
         notas.forEach(n => {
             const pesoEnviado = Number(n.peso_enviado || 0);
@@ -169,19 +177,23 @@ window.DashboardConciliacaoModule = {
                 }
             }
 
-            // Valor das impurezas descontadas (para o card de controle de impurezas)
-            totalImpurezaValor += (impKg * precoMes);
+            // Valor das impurezas descontadas (SÓ CONTA SE AINDA NÃO FOI COMPENSADA NA CONTA CORRENTE)
+            if (!nfsCompensadas.has(n.numero_nota)) {
+                totalImpurezaValor += (impKg * precoMes);
+            }
 
             const valorGerPago = Number(n.valor_gerdau_com_imposto) || 0;
             valorGerdauTotalPago += valorGerPago;
 
-            // === FÓRMULA DO RESULTADO DE CAIXA ===
-            // Resultado = Peso_Gerdau × Preço_Sucata_Mês × 1,12 (ICMS) − Valor_Pago_Gerdau
+            // === FÓRMULA DO RESULTADO DE CAIXA (SÓ CONTA SE AINDA NÃO FOI COMPENSADA) ===
             if (n.status_conciliacao !== 'Pendente Gerdau' && n.status_conciliacao !== 'Falta no Sygecom') {
                 const icmsMult = n.status_conciliacao === 'Baixa Manual' ? 1 : 1.12;
                 const valorEsperado = pesoRecebido * precoMes * icmsMult;
                 const resultado = valorEsperado - valorGerPago;
-                valorTotalPrejuizoCaixa += resultado;
+
+                if (!nfsCompensadas.has(n.numero_nota)) {
+                    valorTotalPrejuizoCaixa += resultado;
+                }
             }
 
             // Contagem de alertas
