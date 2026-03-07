@@ -185,42 +185,31 @@ window.ContaCorrenteModule = {
                         <div>
                             <label style="color:var(--text-secondary); font-size:0.85rem;">Tipo *</label>
                             <select id="cc-tipo" class="form-control" onchange="window.ContaCorrenteModule.onTipoChange(this.value)" style="margin-top:4px; width:100%; background:rgba(15,23,42,0.8); color:white; border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:8px 12px;">
-                                <option value="saldo_inicial">Saldo Devedor/Credor Inicial</option>
-                                <option value="adiantamento">Adiantamento (recebido da Gerdau)</option>
-                                <option value="abatimento_nf">Abatimento de NF (selecionar NF importada)</option>
-                                <option value="complemento">Complemento (desconto da Gerdau)</option>
+                                <option value="saldo_inicial">Saldo Inicial (Devedor/Credor)</option>
+                                <option value="adiantamento">Adiantamento Recebido</option>
+                                <option value="complemento">Complemento / Ajuste</option>
                             </select>
                         </div>
 
-                        <!-- Campo NF: aparece apenas quando tipo = abatimento_nf -->
-                        <div id="cc-nf-selector" style="display:none;">
-                            <label style="color:var(--text-secondary); font-size:0.85rem;">Selecionar NF *</label>
-                            <select id="cc-nf-lista" class="form-control" onchange="window.ContaCorrenteModule.onNfSelect(this.value)" style="margin-top:4px; width:100%; background:rgba(15,23,42,0.8); color:white; border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:8px 12px;">
-                                <option value="">Carregando NFs...</option>
-                            </select>
-                        </div>
-                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+                        <div style="display:grid; grid-template-columns:1fr 1.5fr; gap:1rem;">
                             <div>
                                 <label style="color:var(--text-secondary); font-size:0.85rem;">Data *</label>
                                 <input type="date" id="cc-data" class="form-control" style="margin-top:4px; width:100%; background:rgba(15,23,42,0.8); color:white; border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:8px 12px;" value="${new Date().toISOString().split('T')[0]}">
                             </div>
                             <div>
+                                <label style="color:var(--text-secondary); font-size:0.85rem;">Descrição</label>
+                                <input type="text" id="cc-descricao" class="form-control" placeholder="Ex.: Adiantamento março, Complemento..." style="margin-top:4px; width:100%; background:rgba(15,23,42,0.8); color:white; border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:8px 12px;">
+                            </div>
+                        </div>
+
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+                            <div>
                                 <label style="color:var(--text-secondary); font-size:0.85rem;">Valor (R$) *</label>
                                 <input type="number" id="cc-valor" step="0.01" min="0" class="form-control" placeholder="0.00" style="margin-top:4px; width:100%; background:rgba(15,23,42,0.8); color:white; border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:8px 12px;">
                             </div>
-                        </div>
-                        <div>
-                            <label style="color:var(--text-secondary); font-size:0.85rem;">Descrição</label>
-                            <input type="text" id="cc-descricao" class="form-control" placeholder="Ex.: Adiantamento março, Complemento impureza..." style="margin-top:4px; width:100%; background:rgba(15,23,42,0.8); color:white; border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:8px 12px;">
-                        </div>
-                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
                             <div>
-                                <label style="color:var(--text-secondary); font-size:0.85rem;">Nº NF (se abatimento)</label>
-                                <input type="text" id="cc-nota" class="form-control" placeholder="Ex.: 000123" style="margin-top:4px; width:100%; background:rgba(15,23,42,0.8); color:white; border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:8px 12px;">
-                            </div>
-                            <div>
-                                <label style="color:var(--text-secondary); font-size:0.85rem;">Gerdau diz (R$) — opcional</label>
-                                <input type="number" id="cc-gerdau" step="0.01" min="0" class="form-control" placeholder="Para conferência" style="margin-top:4px; width:100%; background:rgba(15,23,42,0.8); color:white; border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:8px 12px;">
+                                <label style="color:var(--text-secondary); font-size:0.85rem;">Gerdau diz (R$)</label>
+                                <input type="number" id="cc-gerdau" step="0.01" min="0" class="form-control" placeholder="Opcional" style="margin-top:4px; width:100%; background:rgba(15,23,42,0.8); color:white; border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:8px 12px;">
                             </div>
                         </div>
                     </div>
@@ -250,7 +239,6 @@ window.ContaCorrenteModule = {
         const data = document.getElementById('cc-data')?.value;
         const valor = parseFloat(document.getElementById('cc-valor')?.value);
         const descricao = document.getElementById('cc-descricao')?.value;
-        const numero_nota = document.getElementById('cc-nota')?.value;
         const valor_gerdau = document.getElementById('cc-gerdau')?.value;
 
         const isSaldoInicial = tipo === 'saldo_inicial';
@@ -264,7 +252,7 @@ window.ContaCorrenteModule = {
             const res = await fetch(`${baseUrl}/api/conciliacao/conta-corrente`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ tipo, data_lancamento: data, valor, descricao, numero_nota, valor_gerdau: valor_gerdau || null })
+                body: JSON.stringify({ tipo, data_lancamento: data, valor, descricao, valor_gerdau: valor_gerdau || null })
             });
             if (!res.ok) throw new Error('Falha ao salvar lançamento');
             this.fecharModal();
@@ -287,64 +275,13 @@ window.ContaCorrenteModule = {
     },
 
     async onTipoChange(tipo) {
-        const nfSelector = document.getElementById('cc-nf-selector');
-        const notaInput = document.getElementById('cc-nota');
         const valorInput = document.getElementById('cc-valor');
-
-        if (tipo === 'abatimento_nf') {
-            nfSelector.style.display = 'block';
-            if (notaInput) notaInput.closest('div').style.display = 'none';
-            // Carrega NFs do banco
-            await this.carregarNFs();
-        } else {
-            nfSelector.style.display = 'none';
-            if (notaInput) notaInput.closest('div').style.display = 'block';
-        }
 
         // Saldo inicial pode ser negativo (devedor ou credor)
         if (tipo === 'saldo_inicial') {
             if (valorInput) { valorInput.min = ''; valorInput.placeholder = 'Positivo = devedor, Negativo = credor'; }
         } else {
             if (valorInput) { valorInput.min = '0'; valorInput.placeholder = '0.00'; }
-        }
-    },
-
-    async carregarNFs() {
-        const select = document.getElementById('cc-nf-lista');
-        if (!select) return;
-        try {
-            const baseUrl = window.location.origin.includes('localhost') ? 'http://localhost:3000' : '';
-            const res = await fetch(`${baseUrl}/api/conciliacao/analise/notas`);
-            if (!res.ok) throw new Error('Falha ao carregar NFs');
-            const notas = await res.json();
-            this._notasCache = notas;
-            if (notas.length === 0) {
-                select.innerHTML = '<option value="">Nenhuma NF importada encontrada</option>';
-                return;
-            }
-            select.innerHTML = '<option value="">-- Selecione uma NF --</option>' +
-                notas.map(n => {
-                    const val = Number(n.valor_gerdau_com_imposto || n.valor_sygecom_sem_imposto || 0).toFixed(2);
-                    const data = n.data_emissao ? new Date(n.data_emissao).toLocaleDateString('pt-BR') : '-';
-                    return `<option value="${n.numero_nota}|${val}|${data}">${n.numero_nota} — ${data} — R$ ${val}</option>`;
-                }).join('');
-        } catch (e) {
-            select.innerHTML = '<option value="">Erro ao carregar NFs</option>';
-        }
-    },
-
-    onNfSelect(value) {
-        if (!value) return;
-        const [numNota, val, data] = value.split('|');
-        const notaInput = document.getElementById('cc-nota');
-        const valorInput = document.getElementById('cc-valor');
-        const dataInput = document.getElementById('cc-data');
-        if (notaInput) notaInput.value = numNota;
-        if (valorInput && val) valorInput.value = val;
-        if (dataInput && data) {
-            // Converte dd/mm/yyyy para yyyy-mm-dd
-            const [d, m, y] = data.split('/');
-            if (d && m && y) dataInput.value = `${y}-${m}-${d}`;
         }
     }
 };
