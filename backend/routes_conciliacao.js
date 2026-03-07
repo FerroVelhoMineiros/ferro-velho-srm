@@ -574,7 +574,7 @@ module.exports = (pool) => {
         CREATE TABLE IF NOT EXISTS conta_corrente_gerdau (
             id SERIAL PRIMARY KEY,
             data_lancamento DATE NOT NULL,
-            tipo VARCHAR(30) NOT NULL CHECK (tipo IN ('adiantamento', 'abatimento_nf', 'complemento')),
+            tipo VARCHAR(30) NOT NULL CHECK (tipo IN ('adiantamento', 'abatimento_nf', 'complemento', 'saldo_inicial')),
             descricao TEXT,
             numero_nota VARCHAR(50),
             valor NUMERIC(15, 2) NOT NULL,

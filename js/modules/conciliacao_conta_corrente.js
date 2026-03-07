@@ -21,6 +21,7 @@ window.ContaCorrenteModule = {
         );
 
         this.container = container;
+        this._notasCache = null; // cache das NFs importadas
         await this.loadAndRender();
     },
 
@@ -54,22 +55,24 @@ window.ContaCorrenteModule = {
         let totalAdiantado = 0;
         let totalAbatido = 0;
         let totalComplementos = 0;
+        let saldoInicial = 0;
 
         lancamentos.forEach(l => {
             const v = Number(l.valor);
             if (l.tipo === 'adiantamento') totalAdiantado += v;
             else if (l.tipo === 'abatimento_nf') totalAbatido += v;
             else if (l.tipo === 'complemento') totalComplementos += v;
+            else if (l.tipo === 'saldo_inicial') saldoInicial += v;
         });
 
-        const saldo = totalAdiantado - totalAbatido - totalComplementos;
+        const saldo = saldoInicial + totalAdiantado - totalAbatido - totalComplementos;
         const toneladasDevidas = precoKg > 0 ? (saldo / (precoKg * 1000)) : 0;
 
         const fmtMoney = v => 'R$ ' + Math.abs(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         const fmtTon = v => Math.abs(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' t';
 
         // --- Extrato com saldo acumulado ---
-        let saldoAcum = 0;
+        let saldoAcum = saldoInicial; // começa do saldo inicial
         const rowsHtml = lancamentos.length === 0
             ? `<tr><td colspan="7" style="text-align:center; padding:2rem; color: var(--text-secondary);">Nenhum lançamento. Clique em "Novo Lançamento" para começar.</td></tr>`
             : lancamentos.map(l => {
@@ -78,13 +81,20 @@ window.ContaCorrenteModule = {
                 let sinal = '';
                 let cor = '';
                 if (l.tipo === 'adiantamento') { delta = v; sinal = '+'; cor = '#10b981'; }
+                else if (l.tipo === 'saldo_inicial') { delta = v; sinal = v >= 0 ? '+' : ''; cor = '#3b82f6'; }
                 else { delta = -v; sinal = '-'; cor = '#ef4444'; }
                 saldoAcum += delta;
 
                 const saldoColor = saldoAcum >= 0 ? '#10b981' : '#ef4444';
                 const dataFmt = l.data_lancamento ? new Date(l.data_lancamento).toLocaleDateString('pt-BR') : '-';
-                const tipoLabel = l.tipo === 'adiantamento' ? 'Adiantamento' : l.tipo === 'abatimento_nf' ? 'Abatimento NF' : 'Complemento';
-                const tipoColor = l.tipo === 'adiantamento' ? '#3b82f6' : l.tipo === 'complemento' ? '#f59e0b' : '#6b7280';
+                const tipoLabel = l.tipo === 'adiantamento' ? 'Adiantamento'
+                    : l.tipo === 'abatimento_nf' ? 'Abatimento NF'
+                        : l.tipo === 'complemento' ? 'Complemento'
+                            : 'Saldo Inicial';
+                const tipoColor = l.tipo === 'adiantamento' ? '#10b981'
+                    : l.tipo === 'saldo_inicial' ? '#3b82f6'
+                        : l.tipo === 'complemento' ? '#f59e0b'
+                            : '#6b7280';
 
                 const divergencia = l.valor_gerdau && Math.abs(Number(l.valor_gerdau) - v) > 0.01
                     ? `<span style="color:#f59e0b; font-size:0.75rem;" title="Gerdau diz: R$ ${Number(l.valor_gerdau).toFixed(2)}">⚠️ ${fmtMoney(l.valor_gerdau)}</span>`
@@ -174,10 +184,19 @@ window.ContaCorrenteModule = {
                     <div style="display:flex; flex-direction:column; gap:1rem;">
                         <div>
                             <label style="color:var(--text-secondary); font-size:0.85rem;">Tipo *</label>
-                            <select id="cc-tipo" class="form-control" style="margin-top:4px; width:100%; background:rgba(15,23,42,0.8); color:white; border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:8px 12px;">
+                            <select id="cc-tipo" class="form-control" onchange="window.ContaCorrenteModule.onTipoChange(this.value)" style="margin-top:4px; width:100%; background:rgba(15,23,42,0.8); color:white; border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:8px 12px;">
+                                <option value="saldo_inicial">Saldo Devedor/Credor Inicial</option>
                                 <option value="adiantamento">Adiantamento (recebido da Gerdau)</option>
-                                <option value="abatimento_nf">Abatimento de NF</option>
+                                <option value="abatimento_nf">Abatimento de NF (selecionar NF importada)</option>
                                 <option value="complemento">Complemento (desconto da Gerdau)</option>
+                            </select>
+                        </div>
+
+                        <!-- Campo NF: aparece apenas quando tipo = abatimento_nf -->
+                        <div id="cc-nf-selector" style="display:none;">
+                            <label style="color:var(--text-secondary); font-size:0.85rem;">Selecionar NF *</label>
+                            <select id="cc-nf-lista" class="form-control" onchange="window.ContaCorrenteModule.onNfSelect(this.value)" style="margin-top:4px; width:100%; background:rgba(15,23,42,0.8); color:white; border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:8px 12px;">
+                                <option value="">Carregando NFs...</option>
                             </select>
                         </div>
                         <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
@@ -263,6 +282,68 @@ window.ContaCorrenteModule = {
             await this.loadAndRender();
         } catch (e) {
             alert('Erro: ' + e.message);
+        }
+    },
+
+    async onTipoChange(tipo) {
+        const nfSelector = document.getElementById('cc-nf-selector');
+        const notaInput = document.getElementById('cc-nota');
+        const valorInput = document.getElementById('cc-valor');
+
+        if (tipo === 'abatimento_nf') {
+            nfSelector.style.display = 'block';
+            if (notaInput) notaInput.closest('div').style.display = 'none';
+            // Carrega NFs do banco
+            await this.carregarNFs();
+        } else {
+            nfSelector.style.display = 'none';
+            if (notaInput) notaInput.closest('div').style.display = 'block';
+        }
+
+        // Saldo inicial pode ser negativo (devedor ou credor)
+        if (tipo === 'saldo_inicial') {
+            if (valorInput) { valorInput.min = ''; valorInput.placeholder = 'Positivo = devedor, Negativo = credor'; }
+        } else {
+            if (valorInput) { valorInput.min = '0'; valorInput.placeholder = '0.00'; }
+        }
+    },
+
+    async carregarNFs() {
+        const select = document.getElementById('cc-nf-lista');
+        if (!select) return;
+        try {
+            const baseUrl = window.location.origin.includes('localhost') ? 'http://localhost:3000' : '';
+            const res = await fetch(`${baseUrl}/api/conciliacao/analise/notas`);
+            if (!res.ok) throw new Error('Falha ao carregar NFs');
+            const notas = await res.json();
+            this._notasCache = notas;
+            if (notas.length === 0) {
+                select.innerHTML = '<option value="">Nenhuma NF importada encontrada</option>';
+                return;
+            }
+            select.innerHTML = '<option value="">-- Selecione uma NF --</option>' +
+                notas.map(n => {
+                    const val = Number(n.valor_gerdau_com_imposto || n.valor_sygecom_sem_imposto || 0).toFixed(2);
+                    const data = n.data_emissao ? new Date(n.data_emissao).toLocaleDateString('pt-BR') : '-';
+                    return `<option value="${n.numero_nota}|${val}|${data}">${n.numero_nota} — ${data} — R$ ${val}</option>`;
+                }).join('');
+        } catch (e) {
+            select.innerHTML = '<option value="">Erro ao carregar NFs</option>';
+        }
+    },
+
+    onNfSelect(value) {
+        if (!value) return;
+        const [numNota, val, data] = value.split('|');
+        const notaInput = document.getElementById('cc-nota');
+        const valorInput = document.getElementById('cc-valor');
+        const dataInput = document.getElementById('cc-data');
+        if (notaInput) notaInput.value = numNota;
+        if (valorInput && val) valorInput.value = val;
+        if (dataInput && data) {
+            // Converte dd/mm/yyyy para yyyy-mm-dd
+            const [d, m, y] = data.split('/');
+            if (d && m && y) dataInput.value = `${y}-${m}-${d}`;
         }
     }
 };
