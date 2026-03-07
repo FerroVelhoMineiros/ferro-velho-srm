@@ -57,24 +57,14 @@
                 <a href="#" class="nav-item" data-target="notas_fiscais">
                     <i class="fa-solid fa-file-invoice-dollar"></i> Notas Fiscais
                 </a>
-                <a href="#" class="nav-item" data-target="caminhoes">
-                    <i class="fa-solid fa-truck"></i> Caminhões
-                </a>
-                <a href="#" class="nav-item" data-target="viagens">
-                    <i class="fa-solid fa-route"></i> Viagens
-                </a>
+
                 <a href="#" class="nav-item" data-target="importacao">
                     <i class="fa-solid fa-file-import"></i> Importação de Dados
                 </a>
                 <a href="#" class="nav-item" data-target="conciliacao_notas">
                     <i class="fa-solid fa-magnifying-glass-chart"></i> Conciliação de Notas
                 </a>
-                <a href="#" class="nav-item" data-target="impurezas">
-                    <i class="fa-solid fa-filter"></i> Impurezas (Descontos)
-                </a>
-                <a href="#" class="nav-item" data-target="financeiro_gerdau">
-                    <i class="fa-solid fa-building-columns"></i> Financeiro Gerdau
-                </a>
+
                 <a href="#" class="nav-item" data-target="relatorios">
                     <i class="fa-solid fa-file-excel"></i> Relatórios
                 </a>
@@ -118,9 +108,15 @@
 
     <!-- Scripts -->
     <script src="js/ui.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
     <!-- Módulos da Conciliação -->
     <script src="js/modules/conciliacao_import.js"></script>
     <script src="js/modules/conciliacao_notas.js"></script>
+    <script src="js/modules/conciliacao_notas_crud.js"></script>
+
+    <script src="js/modules/conciliacao_dashboard.js"></script>
+
     <!-- Roteador -->
     <script src="js/app_conciliacao.js"></script>
 </body>

@@ -19,6 +19,7 @@ async function initializeConciliacaoDB() {
       fornecedor VARCHAR(100) NOT NULL,
       origem_material VARCHAR(50) NOT NULL,
       valor_total DECIMAL(15,2) NOT NULL,
+      baixa_manual BOOLEAN DEFAULT FALSE,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
 
@@ -37,7 +38,8 @@ async function initializeConciliacaoDB() {
       produto_recebido VARCHAR(100) NOT NULL,
       peso_recebido DECIMAL(15,2) NOT NULL,
       valor_por_kg DECIMAL(10,4) NOT NULL,
-      valor_total DECIMAL(15,2) NOT NULL
+      valor_total DECIMAL(15,2) NOT NULL,
+      imposto DECIMAL(15,2) DEFAULT 0
     );
 
     CREATE TABLE IF NOT EXISTS impurezas (

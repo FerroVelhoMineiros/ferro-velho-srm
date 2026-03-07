@@ -26,12 +26,12 @@ window.ImportacaoModule = {
                         </div>
                     </div>
                     
-                    <form id="form-import-sygecom" style="margin-top: 1.5rem;">
-                        <div class="drop-zone" id="drop-sygecom" style="border: 2px dashed rgba(255,255,255,0.1); border-radius: 8px; padding: 2rem; text-align: center; margin-bottom: 1rem; cursor: pointer; transition: all 0.2s;">
+                    <form id="form-import-sygecom" style="margin-top: 1.5rem;" onsubmit="window.ImportacaoModule.submitForm(event, 'sygecom')">
+                        <label class="drop-zone" id="drop-sygecom" for="file-sygecom" style="display: block; border: 2px dashed rgba(255,255,255,0.1); border-radius: 8px; padding: 2rem; text-align: center; margin-bottom: 1rem; cursor: pointer; transition: all 0.2s;">
                             <i class="fa-solid fa-file-excel" style="font-size: 2.5rem; color: rgba(255,255,255,0.3); margin-bottom: 1rem;"></i>
                             <p id="label-sygecom" style="margin: 0;">Clique para escolher ou arraste a planilha aqui (.xlsx, .csv)</p>
-                            <input type="file" id="file-sygecom" accept=".xlsx, .xls, .csv" style="display: none;">
-                        </div>
+                            <input type="file" id="file-sygecom" accept=".xlsx, .xls, .csv" style="display: none;" onchange="window.ImportacaoModule.onFileSelected(event, 'sygecom')">
+                        </label>
                         <button type="submit" class="btn btn-primary" style="width: 100%; background: #f59e0b;" id="btn-sygecom" disabled>
                             <i class="fa-solid fa-cloud-arrow-up"></i> Processar Arquivo Sygecom
                         </button>
@@ -48,12 +48,12 @@ window.ImportacaoModule = {
                         </div>
                     </div>
                     
-                    <form id="form-import-gerdau" style="margin-top: 1.5rem;">
-                        <div class="drop-zone" id="drop-gerdau" style="border: 2px dashed rgba(255,255,255,0.1); border-radius: 8px; padding: 2rem; text-align: center; margin-bottom: 1rem; cursor: pointer; transition: all 0.2s;">
+                    <form id="form-import-gerdau" style="margin-top: 1.5rem;" onsubmit="window.ImportacaoModule.submitForm(event, 'gerdau')">
+                        <label class="drop-zone" id="drop-gerdau" for="file-gerdau" style="display: block; border: 2px dashed rgba(255,255,255,0.1); border-radius: 8px; padding: 2rem; text-align: center; margin-bottom: 1rem; cursor: pointer; transition: all 0.2s;">
                             <i class="fa-solid fa-file-excel" style="font-size: 2.5rem; color: rgba(255,255,255,0.3); margin-bottom: 1rem;"></i>
                             <p id="label-gerdau" style="margin: 0;">Clique para escolher ou arraste a planilha aqui (.xlsx, .csv)</p>
-                            <input type="file" id="file-gerdau" accept=".xlsx, .xls, .csv" style="display: none;">
-                        </div>
+                            <input type="file" id="file-gerdau" accept=".xlsx, .xls, .csv" style="display: none;" onchange="window.ImportacaoModule.onFileSelected(event, 'gerdau')">
+                        </label>
                         <button type="submit" class="btn btn-primary" style="width: 100%;" id="btn-gerdau" disabled>
                             <i class="fa-solid fa-cloud-arrow-up"></i> Processar Arquivo Gerdau
                         </button>
@@ -71,35 +71,19 @@ window.ImportacaoModule = {
 
         window.UI.renderView('Importação de Dados Externos', actionsHtml, container, contentHtml);
 
-        this.attachEventListeners();
+        // Ativar drag and drop visuals
+        setTimeout(() => {
+            this.setupDragAndDrop('sygecom');
+            this.setupDragAndDrop('gerdau');
+        }, 50);
     },
 
-    attachEventListeners() {
-        this.setupUploader('sygecom');
-        this.setupUploader('gerdau');
-    },
-
-    setupUploader(type) {
+    setupDragAndDrop(type) {
         const dropZone = document.getElementById(`drop-${type}`);
         const fileInput = document.getElementById(`file-${type}`);
-        const label = document.getElementById(`label-${type}`);
-        const btn = document.getElementById(`btn-${type}`);
-        const form = document.getElementById(`form-import-${type}`);
-        const statusDiv = document.getElementById(`status-${type}`);
 
-        // Click to browse
-        dropZone.addEventListener('click', () => fileInput.click());
+        if (!dropZone || !fileInput) return;
 
-        // File selection
-        fileInput.addEventListener('change', (e) => {
-            if (e.target.files.length > 0) {
-                label.innerText = `Arquivo selecionado: ${e.target.files[0].name}`;
-                dropZone.style.borderColor = 'var(--primary-color)';
-                btn.disabled = false;
-            }
-        });
-
-        // Drag and drop cosmetics
         dropZone.addEventListener('dragover', (e) => {
             e.preventDefault();
             dropZone.style.background = 'rgba(255,255,255,0.05)';
@@ -112,57 +96,79 @@ window.ImportacaoModule = {
             dropZone.style.background = 'transparent';
             if (e.dataTransfer.files.length > 0) {
                 fileInput.files = e.dataTransfer.files;
-                label.innerText = `Arquivo selecionado: ${e.dataTransfer.files[0].name}`;
-                dropZone.style.borderColor = 'var(--primary-color)';
-                btn.disabled = false;
+                // Dispara o onchange manualmente já que o arquivo foi arrastado e solto
+                const event = new Event('change', { bubbles: true });
+                fileInput.dispatchEvent(event);
             }
         });
+    },
 
-        // Submission to NodeJS API
-        form.addEventListener('submit', async (e) => {
-            e.preventDefault();
+    // Funções auxiliares acionadas diretamente pelo HTML (onclick, onchange, onsubmit)
+    onFileSelected(event, type) {
+        const fileInput = event.target;
+        const label = document.getElementById(`label-${type}`);
+        const dropZone = document.getElementById(`drop-${type}`);
+        const btn = document.getElementById(`btn-${type}`);
 
-            if (!fileInput.files || fileInput.files.length === 0) return;
+        if (fileInput.files && fileInput.files.length > 0) {
+            label.innerText = `Arquivo selecionado: ${fileInput.files[0].name}`;
+            dropZone.style.borderColor = 'var(--primary-color)';
+            btn.disabled = false;
+        }
+    },
 
-            const file = fileInput.files[0];
-            const formData = new FormData();
-            formData.append('file', file);
+    async submitForm(event, type) {
+        event.preventDefault();
+        const fileInput = document.getElementById(`file-${type}`);
+        const btn = document.getElementById(`btn-${type}`);
+        const statusDiv = document.getElementById(`status-${type}`);
+        const label = document.getElementById(`label-${type}`);
+        const dropZone = document.getElementById(`drop-${type}`);
 
-            // UI Update
-            const originalBtnHtml = btn.innerHTML;
-            btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Processando Linhas...`;
-            btn.disabled = true;
-            statusDiv.innerHTML = `<span style="color: var(--text-muted)">Enviando para o servidor...</span>`;
+        if (!fileInput.files || fileInput.files.length === 0) return;
 
-            try {
-                // Determine port just in case
-                const baseUrl = window.location.origin.includes('5000') || window.location.origin.includes('localhost')
-                    ? 'http://localhost:3000'
-                    : '';
+        const file = fileInput.files[0];
+        const formData = new FormData();
+        formData.append('file', file);
 
-                const response = await fetch(`${baseUrl}/api/conciliacao/import/${type}`, {
-                    method: 'POST',
-                    body: formData
-                });
+        // UI Update
+        const originalBtnHtml = btn.innerHTML;
+        btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Processando Linhas...`;
+        btn.disabled = true;
+        statusDiv.innerHTML = `<span style="color: var(--text-muted)">Enviando para o servidor...</span>`;
 
-                const data = await response.json();
+        try {
+            const baseUrl = window.location.origin.includes('5000') || window.location.origin.includes('localhost')
+                ? 'http://localhost:3000'
+                : '';
 
-                if (response.ok) {
-                    statusDiv.innerHTML = `<span style="color: #10b981"><i class="fa-solid fa-check-circle"></i> Sucesso! ${data.linhas_processadas} registros inseridos no Banco de Dados.</span>`;
-                    fileInput.value = ''; // clear
-                    label.innerText = 'Clique para escolher ou arraste a planilha aqui (.xlsx, .csv)';
-                    dropZone.style.borderColor = 'rgba(255,255,255,0.1)';
-                } else {
-                    statusDiv.innerHTML = `<span style="color: #ef4444"><i class="fa-solid fa-triangle-exclamation"></i> Erro: ${data.error}</span>`;
-                    btn.disabled = false;
-                }
-            } catch (err) {
-                console.error("Fetch error", err);
-                statusDiv.innerHTML = `<span style="color: #ef4444"><i class="fa-solid fa-triangle-exclamation"></i> Erro de Conexão com Servidor Backend. Verifique se ele está rodando.</span>`;
+            const response = await fetch(`${baseUrl}/api/conciliacao/import/${type}`, {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                statusDiv.innerHTML = `<span style="color: #10b981"><i class="fa-solid fa-check-circle"></i> Sucesso! ${data.linhas_processadas} registros inseridos no Banco de Dados.</span>`;
+                fileInput.value = ''; // clear
+                label.innerText = 'Clique para escolher ou arraste a planilha aqui (.xlsx, .csv)';
+                dropZone.style.borderColor = 'rgba(255,255,255,0.1)';
+            } else {
+                statusDiv.innerHTML = `<span style="color: #ef4444"><i class="fa-solid fa-triangle-exclamation"></i> Erro: ${data.error}</span>`;
                 btn.disabled = false;
-            } finally {
-                btn.innerHTML = originalBtnHtml;
             }
-        });
+        } catch (err) {
+            console.error("Fetch error", err);
+            statusDiv.innerHTML = `<span style="color: #ef4444"><i class="fa-solid fa-triangle-exclamation"></i> Erro de Conexão com Servidor Backend. Verifique se ele está rodando.</span>`;
+            btn.disabled = false;
+        } finally {
+            if (btn.disabled === false) {
+                btn.innerHTML = originalBtnHtml; // Return to normal only if it failed
+            } else {
+                btn.innerHTML = `<i class="fa-solid fa-check"></i> Processado`;
+                setTimeout(() => { btn.innerHTML = originalBtnHtml; }, 3000);
+            }
+        }
     }
 };

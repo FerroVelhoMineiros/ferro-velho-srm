@@ -18,16 +18,12 @@ const AppConciliacao = {
 
         // TODO: In the future, fetch data from /api/conciliacao endpoints here
 
-        // Register modules (placeholders for now until we build them)
+        // Register modules
         this.modules = {
-            dashboard_conciliacao: { render: this.renderWIP },
-            notas_fiscais: { render: this.renderWIP },
-            caminhoes: { render: this.renderWIP },
-            viagens: { render: this.renderWIP },
+            dashboard_conciliacao: window.DashboardConciliacaoModule,
+            notas_fiscais: window.NotasFiscaisModule,
             importacao: window.ImportacaoModule,
             conciliacao_notas: window.ConciliacaoNotasModule,
-            impurezas: { render: this.renderWIP },
-            financeiro_gerdau: { render: this.renderWIP },
             relatorios: { render: this.renderWIP }
         };
 
