@@ -8,6 +8,9 @@ window.ContaCorrenteModule = {
     async render(container) {
         const actionsHtml = `
             <div style="display: flex; gap: 10px; align-items: center;">
+                <button class="btn btn-secondary btn-sm" onclick="window.ContaCorrenteModule.abrirModalConferencia()" style="background:rgba(245,158,11,0.1); color:#f59e0b; border:1px solid rgba(245,158,11,0.2);">
+                    <i class="fa-solid fa-scale-balanced"></i> Conferir c/ Gerdau
+                </button>
                 <button class="btn btn-primary btn-sm" onclick="window.ContaCorrenteModule.abrirModalLancamento()">
                     <i class="fa-solid fa-plus"></i> Novo Lançamento
                 </button>
@@ -96,9 +99,13 @@ window.ContaCorrenteModule = {
                         : l.tipo === 'complemento' ? '#f59e0b'
                             : '#6b7280';
 
-                const divergencia = l.valor_gerdau && Math.abs(Number(l.valor_gerdau) - v) > 0.01
-                    ? `<span style="color:#f59e0b; font-size:0.75rem;" title="Gerdau diz: R$ ${Number(l.valor_gerdau).toFixed(2)}">⚠️ ${fmtMoney(l.valor_gerdau)}</span>`
-                    : `<span style="color:#10b981; font-size:0.75rem;"><i class="fa-solid fa-check"></i></span>`;
+                const divergencia = l.tipo === 'conferencia'
+                    ? (Math.abs(Number(l.valor_gerdau) - saldoAcum) > 0.01
+                        ? `<span style="color:#ef4444; font-size:0.75rem;" title="Saldo Gerdau: R$ ${Number(l.valor_gerdau).toFixed(2)} | Dif: R$ ${(Number(l.valor_gerdau) - saldoAcum).toFixed(2)}">❌ Diferença</span>`
+                        : `<span style="color:#10b981; font-size:0.75rem;"><i class="fa-solid fa-check-double"></i> Ok</span>`)
+                    : (l.valor_gerdau && Math.abs(Number(l.valor_gerdau) - v) > 0.01
+                        ? `<span style="color:#f59e0b; font-size:0.75rem;" title="Gerdau diz: R$ ${Number(l.valor_gerdau).toFixed(2)}">⚠️ ${fmtMoney(l.valor_gerdau)}</span>`
+                        : `<span style="color:#10b981; font-size:0.75rem;"><i class="fa-solid fa-check"></i></span>`);
 
                 return `
                     <tr style="border-bottom: 1px solid var(--border-color);">
@@ -207,15 +214,42 @@ window.ContaCorrenteModule = {
                                 <label style="color:var(--text-secondary); font-size:0.85rem;">Valor (R$) *</label>
                                 <input type="number" id="cc-valor" step="0.01" min="0" class="form-control" placeholder="0.00" style="margin-top:4px; width:100%; background:rgba(15,23,42,0.8); color:white; border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:8px 12px;">
                             </div>
-                            <div>
-                                <label style="color:var(--text-secondary); font-size:0.85rem;">Gerdau diz (R$)</label>
-                                <input type="number" id="cc-gerdau" step="0.01" min="0" class="form-control" placeholder="Opcional" style="margin-top:4px; width:100%; background:rgba(15,23,42,0.8); color:white; border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:8px 12px;">
-                            </div>
                         </div>
                     </div>
                     <div style="display:flex; gap:1rem; margin-top:1.5rem; justify-content:flex-end;">
                         <button class="btn btn-secondary" onclick="window.ContaCorrenteModule.fecharModal()">Cancelar</button>
                         <button class="btn btn-primary" onclick="window.ContaCorrenteModule.salvarLancamento()"><i class="fa-solid fa-save"></i> Salvar</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal Conferência Gerdau -->
+            <div id="modal-conferencia" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:1000; align-items:center; justify-content:center;">
+                <div style="background:var(--bg-card); border-radius:16px; padding:2rem; width:440px; max-width:95vw; border:1px solid #f59e0b44; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4);">
+                    <div style="display:flex; align-items:center; gap:12px; margin-bottom:1.5rem;">
+                        <div style="background:rgba(245,158,11,0.1); padding:10px; border-radius:10px; color:#f59e0b;"><i class="fa-solid fa-scale-balanced fa-lg"></i></div>
+                        <h3 style="margin:0; color:var(--text-primary);">Conferência com Gerdau</h3>
+                    </div>
+                    <p style="color:var(--text-secondary); font-size:0.85rem; margin-bottom:1.5rem;">Informe o saldo total que a Gerdau reportou em seu extrato oficial para comparar com o seu saldo calculado nesta data.</p>
+                    
+                    <div style="display:flex; flex-direction:column; gap:1.2rem;">
+                        <div>
+                            <label style="color:var(--text-secondary); font-size:0.85rem;">Data da Conferência *</label>
+                            <input type="date" id="conf-data" class="form-control" style="margin-top:4px; width:100%; background:rgba(15,23,42,0.8); color:white; border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:8px 12px;" value="${new Date().toISOString().split('T')[0]}">
+                        </div>
+                        <div>
+                            <label style="color:var(--text-secondary); font-size:0.85rem;">Saldo Oficial Gerdau (R$) *</label>
+                            <input type="number" id="conf-saldo" step="0.01" class="form-control" placeholder="0.00" style="margin-top:4px; width:100%; background:rgba(15,23,42,0.8); color:white; border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:8px 12px;">
+                        </div>
+                        <div>
+                            <label style="color:var(--text-secondary); font-size:0.85rem;">Descrição opcional</label>
+                            <input type="text" id="conf-descricao" class="form-control" placeholder="Ex.: Conferência fechamento maio" style="margin-top:4px; width:100%; background:rgba(15,23,42,0.8); color:white; border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:8px 12px;">
+                        </div>
+                    </div>
+                    
+                    <div style="display:flex; gap:1rem; margin-top:2rem; justify-content:flex-end;">
+                        <button class="btn btn-secondary" onclick="window.ContaCorrenteModule.fecharModalConferencia()">Cancelar</button>
+                        <button class="btn btn-primary" onclick="window.ContaCorrenteModule.salvarConferencia()" style="background:#f59e0b; border-color:#d97706;"><i class="fa-solid fa-check"></i> Salvar Conferência</button>
                     </div>
                 </div>
             </div>
@@ -239,7 +273,6 @@ window.ContaCorrenteModule = {
         const data = document.getElementById('cc-data')?.value;
         const valor = parseFloat(document.getElementById('cc-valor')?.value);
         const descricao = document.getElementById('cc-descricao')?.value;
-        const valor_gerdau = document.getElementById('cc-gerdau')?.value;
 
         const isSaldoInicial = tipo === 'saldo_inicial';
         if (!tipo || !data || isNaN(valor) || (!isSaldoInicial && valor <= 0)) {
@@ -252,10 +285,51 @@ window.ContaCorrenteModule = {
             const res = await fetch(`${baseUrl}/api/conciliacao/conta-corrente`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ tipo, data_lancamento: data, valor, descricao, valor_gerdau: valor_gerdau || null })
+                body: JSON.stringify({ tipo, data_lancamento: data, valor, descricao, valor_gerdau: null })
             });
             if (!res.ok) throw new Error('Falha ao salvar lançamento');
             this.fecharModal();
+            await this.loadAndRender();
+        } catch (e) {
+            alert('Erro: ' + e.message);
+        }
+    },
+
+    abrirModalConferencia() {
+        const modal = document.getElementById('modal-conferencia');
+        if (modal) modal.style.display = 'flex';
+    },
+
+    fecharModalConferencia() {
+        const modal = document.getElementById('modal-conferencia');
+        if (modal) modal.style.display = 'none';
+    },
+
+    async salvarConferencia() {
+        const data = document.getElementById('conf-data')?.value;
+        const saldoGerdau = parseFloat(document.getElementById('conf-saldo')?.value);
+        const descricao = document.getElementById('conf-descricao')?.value || 'Conferência de Saldo Gerdau';
+
+        if (!data || isNaN(saldoGerdau)) {
+            alert('Preencha a data e o saldo oficial da Gerdau.');
+            return;
+        }
+
+        try {
+            const baseUrl = window.location.origin.includes('localhost') ? 'http://localhost:3000' : '';
+            const res = await fetch(`${baseUrl}/api/conciliacao/conta-corrente`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    tipo: 'conferencia',
+                    data_lancamento: data,
+                    valor: 0,
+                    descricao,
+                    valor_gerdau: saldoGerdau
+                })
+            });
+            if (!res.ok) throw new Error('Falha ao salvar conferência');
+            this.fecharModalConferencia();
             await this.loadAndRender();
         } catch (e) {
             alert('Erro: ' + e.message);

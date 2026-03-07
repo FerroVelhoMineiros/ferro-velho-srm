@@ -294,7 +294,7 @@ window.DashboardConciliacaoModule = {
                         <div style="background: ${saldoCC > 0 ? 'rgba(239,68,68,0.1)' : 'rgba(16,185,129,0.1)'}; padding: 8px; border-radius: 8px; color: ${saldoColor};"><i class="fa-solid ${saldoIcon}"></i></div>
                     </div>
                     <div style="font-size: 2rem; font-weight: 700; color: ${saldoColor};">${fmtM(saldoCC)}</div>
-                    <div style="margin-top: 10px; font-size: 0.85rem; color: var(--text-secondary);">${saldoCC > 0 ? `≈ ${Math.abs(toneladasDevidas).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} t a enviar` : 'Saldo quitado ✅'} <i class="fa-solid fa-arrow-right" style="font-size:0.7rem; opacity:0.5;"></i></div>
+                    <div style="margin-top: 10px; font-size: 0.85rem; color: var(--text-secondary);">${saldoCC > 0 ? `≈ ${Math.abs(toneladasDevidas).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} t a enviar` : 'Saldo quitado / Crédito ✅'} <i class="fa-solid fa-arrow-right" style="font-size:0.7rem; opacity:0.5;"></i></div>
                 </div>`;
             })()}
 
