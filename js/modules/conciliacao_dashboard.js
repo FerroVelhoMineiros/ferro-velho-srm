@@ -310,7 +310,15 @@ window.DashboardConciliacaoModule = {
                 const efIcon = saldoEfetivo > 0 ? 'fa-building-columns' : 'fa-piggy-bank';
                 const fmtM = v => 'R$ ' + Math.abs(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                 return `
-                <div class="metric-card" style="display: flex; flex-direction: column; align-items: stretch; gap: 0; background-color: var(--bg-card); padding: 1.5rem; border-radius: 12px; border: 1px solid ${efColor}; border-width: 2px; box-shadow: var(--shadow-sm);">
+                <div class="metric-card" 
+                     style="display: flex; flex-direction: column; align-items: stretch; gap: 0; background-color: var(--bg-card); padding: 1.5rem; border-radius: 12px; border: 1px solid ${efColor}; border-width: 2px; box-shadow: var(--shadow-sm);"
+                     title="Cálculo do Saldo Efetivo:
+(+) Saldo CC: ${fmtM(saldoCC)}
+(-) Resultado (Diferença): ${fmtM(valorTotalPrejuizoCaixa)}
+(-) NFs em Aberto (Est.): ${fmtM(valorNfsAberto)}
+(-) Impurezas: ${fmtM(totalImpurezaValor)}
+----------------------------
+(=) Saldo Efetivo: ${fmtM(saldoEfetivo)}">
                     <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
                         <h3 style="color: var(--text-secondary); font-size: 0.9rem; margin: 0; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Saldo Efetivo Geral</h3>
                         <div style="background: ${saldoEfetivo > 0 ? 'rgba(239,68,68,0.1)' : 'rgba(16,185,129,0.1)'}; padding: 8px; border-radius: 8px; color: ${efColor};"><i class="fa-solid ${efIcon}"></i></div>
