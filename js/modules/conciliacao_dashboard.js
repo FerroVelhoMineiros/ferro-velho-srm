@@ -168,62 +168,69 @@ window.DashboardConciliacaoModule = {
         });
 
         notas.forEach(n => {
-            const pesoEnviado = Number(n.peso_enviado || 0);
-            totalEnviadoKg += pesoEnviado;
-            const pesoRecebido = Number(n.peso_recebido || 0);
-            totalRecebidoKg += pesoRecebido;
+            const mesEmissao = n.data_emissao ? new Date(n.data_emissao).toISOString().substring(0, 7) : null;
+            const mesRecebimento = n.data_recebimento_gerdau ? new Date(n.data_recebimento_gerdau).toISOString().substring(0, 7) : null;
 
-            const impKg = Number(n.impurezas || 0);
-            totalImpurezaKg += impKg;
+            // --- 1. VOLUME ENVIADO (Baseado na Data de Emissão da Nota) ---
+            if (!mesFiltro || mesEmissao === mesFiltro) {
+                const pesoEnviado = Number(n.peso_enviado || 0);
+                totalEnviadoKg += pesoEnviado;
 
-            // Busca preço de compra da sucata do mês específico da nota
-            let precoMes = globalPriceFallback;
-            if (n.data_emissao) {
-                const mesNota = new Date(n.data_emissao).toISOString().substring(0, 7);
-                if (configMap[mesNota]) {
-                    precoMes = configMap[mesNota];
+                // Acumula valor Sygecom apenas para referência
+                const valorSygBruto = Number(n.valor_sygecom_sem_imposto) || 0;
+                const icmsMult = n.status_conciliacao === 'Baixa Manual' ? 1 : 1.12;
+                valorSygecomTotalComImposto += valorSygBruto * icmsMult;
+
+                // NFs em Aberto (Só contam se a emissão for no mês filtrado)
+                if (n.status_conciliacao === 'Pendente Gerdau') {
+                    let precoNota = configMap[mesEmissao] || configMap['GLOBAL'] || 0.50;
+                    valorNfsAberto += (pesoEnviado * precoNota * 1.12);
+                    alertasGerdauPendentes++;
+                }
+
+                // Divergência de peso (Volume Enviado vs Recebido)
+                if (n.status_conciliacao === 'Divergência') {
+                    alertasDivergencia++;
+                    const desc = Number(n.diferenca_peso || 0);
+                    if (desc > 0) totalPerdaKg += desc;
                 }
             }
 
-            // Valor das impurezas descontadas (Soma bruta)
-            totalImpurezaValor += (impKg * precoMes);
+            // --- 2. VOLUME RECEBIDO E RESULTADO (Baseado na Data de Recebimento da Gerdau) ---
+            if (!mesFiltro || mesRecebimento === mesFiltro) {
+                const pesoRecebido = Number(n.peso_recebido || 0);
+                totalRecebidoKg += pesoRecebido;
 
-            const valorGerPago = Number(n.valor_gerdau_com_imposto) || 0;
-            valorGerdauTotalPago += valorGerPago;
+                const impKg = Number(n.impurezas || 0);
+                totalImpurezaKg += impKg;
 
-            // === FÓRMULA DO RESULTADO DE CAIXA (LÍQUIDO) ===
-            if (n.status_conciliacao !== 'Pendente Gerdau' && n.status_conciliacao !== 'Falta no Sygecom') {
-                // NOTAS DE 1 KG: Ignorar no cálculo do resultado (são ajustes técnicos já resolvidos)
-                if (pesoRecebido === 1) return;
+                // Busca preço de compra da sucata do mês específico do recebimento
+                let precoMes = mesRecebimento && configMap[mesRecebimento] ? configMap[mesRecebimento] : (configMap['GLOBAL'] || 0.50);
 
-                const valorSygBruto = Number(n.valor_sygecom_sem_imposto) || 0;
-                const impostoPagoSygecom = valorSygBruto * 0.12;
+                // Valor das impurezas descontadas (Soma bruta)
+                totalImpurezaValor += (impKg * precoMes);
 
-                // Líquido que sobrou da Gerdau (Total pago - Imposto já pago na emissão)
-                const recebidoLiquidoGerdau = valorGerPago - impostoPagoSygecom;
+                const valorGerPago = Number(n.valor_gerdau_com_imposto) || 0;
+                valorGerdauTotalPago += valorGerPago;
 
-                // Líquido esperado (Peso Gerdau * Seu Preço de Compra)
-                const esperadoLiquido = pesoRecebido * precoMes;
+                // === FÓRMULA DO RESULTADO DE CAIXA (LÍQUIDO) ===
+                if (n.status_conciliacao !== 'Pendente Gerdau' && n.status_conciliacao !== 'Falta no Sygecom') {
+                    // NOTAS DE 1 KG: Ignorar no cálculo do resultado (são ajustes técnicos já resolvidos)
+                    if (pesoRecebido === 1) return;
 
-                const resultado = esperadoLiquido - recebidoLiquidoGerdau;
-                valorTotalPrejuizoCaixa += resultado;
+                    const valorSygBruto = Number(n.valor_sygecom_sem_imposto) || 0;
+                    const impostoPagoSygecom = valorSygBruto * 0.12;
+
+                    // Líquido que sobrou da Gerdau (Total pago - Imposto já pago na emissão)
+                    const recebidoLiquidoGerdau = valorGerPago - impostoPagoSygecom;
+
+                    // Líquido esperado (Peso Gerdau * Seu Preço de Compra)
+                    const esperadoLiquido = pesoRecebido * precoMes;
+
+                    const resultado = esperadoLiquido - recebidoLiquidoGerdau;
+                    valorTotalPrejuizoCaixa += resultado;
+                }
             }
-
-            // Contagem de alertas
-            if (n.status_conciliacao === 'Divergência') {
-                alertasDivergencia++;
-                const desc = Number(n.diferenca_peso || 0);
-                if (desc > 0) totalPerdaKg += desc;
-            } else if (n.status_conciliacao === 'Pendente Gerdau') {
-                alertasGerdauPendentes++;
-                // Estima o valor dessa nota em aberto
-                valorNfsAberto += (pesoEnviado * precoMes * 1.12);
-            }
-
-            // Acumula valor Sygecom apenas para referência
-            const valorSygBruto = Number(n.valor_sygecom_sem_imposto) || 0;
-            const icmsMult = n.status_conciliacao === 'Baixa Manual' ? 1 : 1.12;
-            valorSygecomTotalComImposto += valorSygBruto * icmsMult;
         });
 
         // Proteção contra divisão por zero

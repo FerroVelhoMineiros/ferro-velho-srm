@@ -133,6 +133,14 @@ module.exports = (pool) => {
                     const valor_total = parseFloat(getCol(['Valor Gerdau', 'Valor Liquido', 'valor_total'])) || 0;
                     const valor_por_kg = peso_recebido > 0 ? (valor_total / peso_recebido) : 0;
 
+                    let dataMigoRaw = getCol(['MIGO', 'Data', 'Data de Lançamento', 'Data Migo', 'data_recebimento']);
+                    let data_recebimento = null;
+                    if (typeof dataMigoRaw === 'number') {
+                        data_recebimento = new Date(Math.round((dataMigoRaw - 25569) * 86400 * 1000));
+                    } else if (dataMigoRaw) {
+                        data_recebimento = new Date(dataMigoRaw);
+                    }
+
                     // Previne quebra de chave estrangeira se o usuário importar GERDAU antes de importar o SYGECOM base
                     const notaExists = await client.query('SELECT 1 FROM notas_fiscais WHERE numero_nota = $1', [numero_nota]);
                     if (notaExists.rows.length === 0) {
@@ -147,8 +155,8 @@ module.exports = (pool) => {
 
                     if (itemExists.rows.length === 0) {
                         await client.query(
-                            'INSERT INTO itens_recebidos_gerdau (numero_nota, produto_recebido, peso_recebido, valor_por_kg, valor_total, imposto) VALUES ($1, $2, $3, $4, $5, $6)',
-                            [numero_nota, produto_recebido, peso_recebido, valor_por_kg, valor_total, imposto_gerdau]
+                            'INSERT INTO itens_recebidos_gerdau (numero_nota, produto_recebido, peso_recebido, valor_por_kg, valor_total, imposto, data_recebimento) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+                            [numero_nota, produto_recebido, peso_recebido, valor_por_kg, valor_total, imposto_gerdau, data_recebimento]
                         );
                     }
                 }
@@ -178,8 +186,9 @@ module.exports = (pool) => {
             let params = [];
 
             if (mes) {
-                // Filtra pelo mes especificado na data_emissao da nota (Formato YYYY-MM)
-                whereClause = 'WHERE TO_CHAR(nf.data_emissao, \'YYYY-MM\') = $1';
+                // Filtra pelo mes especificado na data_emissao da nota OU na data_recebimento da Gerdau (Formato YYYY-MM)
+                whereClause = `WHERE TO_CHAR(nf.data_emissao, 'YYYY-MM') = $1 
+                               OR TO_CHAR(g.data_recebimento, 'YYYY-MM') = $1`;
                 params.push(mes);
             }
 
@@ -191,7 +200,7 @@ module.exports = (pool) => {
                     FROM itens_nota_sygecom GROUP BY numero_nota
                 ),
                 gerdau_totals AS (
-                    SELECT numero_nota, SUM(peso_recebido) as peso_recebido, SUM(valor_total) as valor_pago, SUM(imposto) as imposto_gerdau
+                    SELECT numero_nota, SUM(peso_recebido) as peso_recebido, SUM(valor_total) as valor_pago, SUM(imposto) as imposto_gerdau, MAX(data_recebimento) as data_recebimento
                     FROM itens_recebidos_gerdau GROUP BY numero_nota
                 ),
                 impurezas_totais AS (
@@ -204,6 +213,7 @@ module.exports = (pool) => {
                     nf.data_emissao,
                     nf.fornecedor,
                     nf.baixa_manual,
+                    g.data_recebimento as data_recebimento_gerdau,
                     COALESCE(s.peso_enviado, 0) as peso_enviado,
                     CASE WHEN nf.baixa_manual THEN COALESCE(s.peso_enviado, 0) ELSE COALESCE(g.peso_recebido, 0) END as peso_recebido,
                     COALESCE(i.desconto, 0) as impurezas,
