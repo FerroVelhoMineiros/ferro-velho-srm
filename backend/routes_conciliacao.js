@@ -103,10 +103,10 @@ module.exports = (pool) => {
                 for (const row of data) {
                     // Helper para encontrar valores independente de espaços extras nos títulos do Excel e respeitar a ordem de prioridade
                     const getCol = (possibleNames) => {
+                        const rowKeys = Object.keys(row);
                         for (const name of possibleNames) {
-                            for (const k in row) {
-                                if (k.trim() === name) return row[k];
-                            }
+                            const foundKey = rowKeys.find(k => k.trim().toLowerCase() === name.toLowerCase());
+                            if (foundKey) return row[foundKey];
                         }
                         return undefined;
                     };
@@ -133,9 +133,10 @@ module.exports = (pool) => {
                     const valor_total = parseFloat(getCol(['Valor Gerdau', 'Valor Liquido', 'valor_total'])) || 0;
                     const valor_por_kg = peso_recebido > 0 ? (valor_total / peso_recebido) : 0;
 
-                    let dataMigoRaw = getCol(['MIGO', 'Data', 'Data de Lançamento', 'Data Migo', 'data_recebimento']);
+                    let dataMigoRaw = getCol(['MIGO', 'Data', 'Data de lançamento', 'Data de Lançamento', 'Data Migo', 'data_recebimento']);
                     let data_recebimento = null;
                     if (typeof dataMigoRaw === 'number') {
+                        // Converte data serial do Excel (ex: 45321)
                         data_recebimento = new Date(Math.round((dataMigoRaw - 25569) * 86400 * 1000));
                     } else if (dataMigoRaw) {
                         data_recebimento = new Date(dataMigoRaw);
