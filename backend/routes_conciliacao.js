@@ -158,6 +158,12 @@ module.exports = (pool) => {
                             'INSERT INTO itens_recebidos_gerdau (numero_nota, produto_recebido, peso_recebido, valor_por_kg, valor_total, imposto, data_recebimento) VALUES ($1, $2, $3, $4, $5, $6, $7)',
                             [numero_nota, produto_recebido, peso_recebido, valor_por_kg, valor_total, imposto_gerdau, data_recebimento]
                         );
+                    } else {
+                        // Se já existe, apenas atualiza a data de recebimento e valores, caso tenham sido corrigidos na planilha
+                        await client.query(
+                            'UPDATE itens_recebidos_gerdau SET data_recebimento = $1, imposto = $2, valor_total = $3, valor_por_kg = $4 WHERE numero_nota = $5 AND produto_recebido = $6 AND peso_recebido = $7',
+                            [data_recebimento, imposto_gerdau, valor_total, valor_por_kg, numero_nota, produto_recebido, peso_recebido]
+                        );
                     }
                 }
 
